@@ -1,9 +1,11 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from "vue";
 import GameLog from "./GameLog.vue";
+import { getSessionId, resetSessionId, addSessionToUrl } from "../utils/session.js";
 
 const API = "/api/game/2048";
 const logRef = ref(null);
+const sessionId = ref(null);
 
 const board = ref([]);
 const score = ref(0);
@@ -16,17 +18,29 @@ const lastAction = ref("");
 // ── API helpers ────────────────────────────────────────────────────
 
 async function fetchState() {
-  const res = await fetch(`${API}/state`);
-  applyState(await res.json());
+  const sid = getSessionId("2048");
+  sessionId.value = sid;
+  const url = addSessionToUrl(`${API}/state`, sid);
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.session_id) {
+    sessionId.value = data.session_id;
+  }
+  applyState(data);
 }
 
 async function sendAction(move) {
   lastAction.value = move;
   error.value = "";
-  const res = await fetch(`${API}/action?move=${move}`);
+  const sid = sessionId.value || getSessionId("2048");
+  const url = addSessionToUrl(`${API}/action?move=${move}`, sid);
+  const res = await fetch(url);
   const data = await res.json();
   if (data.error) {
     error.value = data.error;
+  }
+  if (data.session_id) {
+    sessionId.value = data.session_id;
   }
   applyState(data);
   logRef.value?.fetchLog();
@@ -35,8 +49,16 @@ async function sendAction(move) {
 async function resetGame() {
   lastAction.value = "";
   error.value = "";
-  const res = await fetch(`${API}/reset`);
-  applyState(await res.json());
+  // Reset session ID to get a fresh game instance
+  const sid = resetSessionId("2048");
+  sessionId.value = sid;
+  const url = addSessionToUrl(`${API}/reset`, sid);
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.session_id) {
+    sessionId.value = data.session_id;
+  }
+  applyState(data);
   logRef.value?.fetchLog();
 }
 
@@ -171,7 +193,7 @@ function tileStyle(value) {
     <p class="hint">Use arrow keys or WASD to play</p>
 
     <!-- Log -->
-    <GameLog ref="logRef" game-name="2048" />
+    <GameLog ref="logRef" game-name="2048" :session-id="sessionId" />
   </div>
 </template>
 

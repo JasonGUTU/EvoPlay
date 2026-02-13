@@ -1,9 +1,11 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, nextTick } from "vue";
 import GameLog from "./GameLog.vue";
+import { getSessionId, resetSessionId, addSessionToUrl } from "../utils/session.js";
 
 const API = "/api/game/mergefall";
 const logRef = ref(null);
+const sessionId = ref(null);
 
 const board = ref([]);
 const width = ref(5);
@@ -34,8 +36,14 @@ function initAnimGrid() {
 // ── API helpers ────────────────────────────────────────────────────
 
 async function fetchState() {
-  const res = await fetch(`${API}/state`);
+  const sid = getSessionId("mergefall");
+  sessionId.value = sid;
+  const url = addSessionToUrl(`${API}/state`, sid);
+  const res = await fetch(url);
   const data = await res.json();
+  if (data.session_id) {
+    sessionId.value = data.session_id;
+  }
   applyState(data, false);
 }
 
@@ -47,10 +55,15 @@ async function dropInColumn(col) {
 
   const oldBoard = board.value.map((row) => [...row]);
 
-  const res = await fetch(`${API}/action?move=drop ${col}`);
+  const sid = sessionId.value || getSessionId("mergefall");
+  const url = addSessionToUrl(`${API}/action?move=drop ${col}`, sid);
+  const res = await fetch(url);
   const data = await res.json();
   if (data.error) {
     error.value = data.error;
+  }
+  if (data.session_id) {
+    sessionId.value = data.session_id;
   }
   const gain = data.score - prevScore.value;
   lastGain.value = gain;
@@ -69,8 +82,16 @@ async function resetGame() {
   error.value = "";
   lastGain.value = 0;
   particles.splice(0);
-  const res = await fetch(`${API}/reset`);
-  applyState(await res.json(), false);
+  // Reset session ID to get a fresh game instance
+  const sid = resetSessionId("mergefall");
+  sessionId.value = sid;
+  const url = addSessionToUrl(`${API}/reset`, sid);
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.session_id) {
+    sessionId.value = data.session_id;
+  }
+  applyState(data, false);
   logRef.value?.fetchLog();
 }
 
@@ -282,7 +303,7 @@ function particleStyle(p) {
     <p class="hint">Click a column or press 1-5 to drop</p>
 
     <!-- Log -->
-    <GameLog ref="logRef" game-name="mergefall" />
+    <GameLog ref="logRef" game-name="mergefall" :session-id="sessionId" />
   </div>
 </template>
 

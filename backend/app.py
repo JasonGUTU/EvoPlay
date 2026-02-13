@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import json
+import uuid
 from datetime import datetime, timezone
 
 from flask import Flask, jsonify, request
@@ -32,18 +33,52 @@ GAMES: dict[str, type] = {
     "mergefall": MergeFall,
 }
 
-# Active game sessions keyed by game name (single-player for now).
-sessions: dict[str, object] = {}
+# Active game sessions keyed by (game_name, session_id) tuple.
+# Each frontend gets its own independent game instance.
+sessions: dict[tuple[str, str], object] = {}
 
 
-def _get_game(name: str):
-    """Return the active session for *name*, creating one if needed."""
-    if name not in sessions:
-        if name not in GAMES:
+def _get_session_id(required: bool = False) -> str | None:
+    """
+    Extract session ID from request.
+    If required=True and not provided, returns None.
+    If required=False and not provided, generates a new one.
+    """
+    session_id = request.args.get("session_id")
+    if not session_id:
+        if required:
             return None
-        sessions[name] = GAMES[name]()
-        log.info("Created new session for game '%s'", name)
-    return sessions[name]
+        # Generate a new session ID if not provided and not required
+        session_id = str(uuid.uuid4())
+    return session_id
+
+
+def _get_game(name: str, session_id: str | None = None, require_session: bool = False):
+    """
+    Return the game instance for *name* and *session_id*.
+    
+    Args:
+        name: Game name
+        session_id: Optional session ID. If None, gets from request.
+        require_session: If True, session_id must be provided or returns error.
+    
+    Returns:
+        (game_instance, session_id) or (None, None) if error
+    """
+    if session_id is None:
+        session_id = _get_session_id(required=require_session)
+        if require_session and session_id is None:
+            return None, None
+    
+    key = (name, session_id)
+    
+    if key not in sessions:
+        if name not in GAMES:
+            return None, None
+        sessions[key] = GAMES[name]()
+        log.info("Created new session for game '%s' with session_id '%s'", name, session_id)
+    
+    return sessions[key], session_id
 
 
 def _log_action(game_name: str, action: str | None, state: dict) -> None:
@@ -68,11 +103,14 @@ def list_games():
 
 @app.get("/api/game/<name>/state")
 def game_state(name: str):
-    """Return current state without modifying it."""
-    game = _get_game(name)
+    """Return current state without modifying it. Requires session_id parameter."""
+    game, session_id = _get_game(name, require_session=True)
+    if session_id is None:
+        return jsonify({"error": "Missing required 'session_id' query parameter."}), 400
     if game is None:
         return jsonify({"error": f"Unknown game: {name}"}), 404
     state = game.get_state()
+    state["session_id"] = session_id  # Include session_id in response
     return jsonify(state)
 
 
@@ -82,10 +120,11 @@ def game_action(name: str):
     Apply an action via query parameter.
 
     Examples:
-        GET /api/game/2048/action?move=up
+        GET /api/game/2048/action?move=up&session_id=abc123
         GET /api/game/2048/action?move=left
+        (If session_id is omitted, a new one will be generated)
     """
-    game = _get_game(name)
+    game, session_id = _get_game(name)
     if game is None:
         return jsonify({"error": f"Unknown game: {name}"}), 404
 
@@ -94,37 +133,45 @@ def game_action(name: str):
         return jsonify({"error": "Missing 'move' query parameter."}), 400
 
     state = game.apply_action(move)
-    _log_action(name, move, state)
+    state["session_id"] = session_id  # Include session_id in response
+    _log_action(f"{name}[{session_id[:8]}]", move, state)
     return jsonify(state)
 
 
 @app.get("/api/game/<name>/reset")
 def game_reset(name: str):
     """Reset the game and return the fresh state."""
-    game = _get_game(name)
+    game, session_id = _get_game(name)
     if game is None:
         return jsonify({"error": f"Unknown game: {name}"}), 404
     state = game.reset()
-    _log_action(name, "RESET", state)
+    state["session_id"] = session_id  # Include session_id in response
+    _log_action(f"{name}[{session_id[:8]}]", "RESET", state)
     return jsonify(state)
 
 
 @app.get("/api/game/<name>/valid_actions")
 def game_valid_actions(name: str):
-    """Return currently valid actions."""
-    game = _get_game(name)
+    """Return currently valid actions. Requires session_id parameter."""
+    game, session_id = _get_game(name, require_session=True)
+    if session_id is None:
+        return jsonify({"error": "Missing required 'session_id' query parameter."}), 400
     if game is None:
         return jsonify({"error": f"Unknown game: {name}"}), 404
-    return jsonify({"valid_actions": game.valid_actions()})
+    return jsonify({"valid_actions": game.valid_actions(), "session_id": session_id})
 
 
 @app.get("/api/game/<name>/log")
 def game_log(name: str):
-    """Return the operation log for the current session."""
-    game = _get_game(name)
+    """Return the operation log for the current session. Requires session_id parameter."""
+    game, session_id = _get_game(name, require_session=True)
+    if session_id is None:
+        return jsonify({"error": "Missing required 'session_id' query parameter."}), 400
     if game is None:
         return jsonify({"error": f"Unknown game: {name}"}), 404
-    return jsonify(game.get_log_info())
+    log_info = game.get_log_info()
+    log_info["session_id"] = session_id
+    return jsonify(log_info)
 
 
 # ── Entry point ─────────────────────────────────────────────────────

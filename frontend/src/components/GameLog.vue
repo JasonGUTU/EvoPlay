@@ -1,8 +1,10 @@
 <script setup>
 import { ref, watch, nextTick } from "vue";
+import { addSessionToUrl } from "../utils/session.js";
 
 const props = defineProps({
   gameName: { type: String, required: true },
+  sessionId: { type: String, default: null },
 });
 
 const steps = ref(0);
@@ -14,7 +16,11 @@ const logListRef = ref(null);
 // Poll log from server after each action
 async function fetchLog() {
   try {
-    const res = await fetch(`/api/game/${props.gameName}/log`);
+    let url = `/api/game/${props.gameName}/log`;
+    if (props.sessionId) {
+      url = addSessionToUrl(url, props.sessionId);
+    }
+    const res = await fetch(url);
     const data = await res.json();
     steps.value = data.steps;
     elapsed.value = data.elapsed_seconds;
