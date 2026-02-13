@@ -1,9 +1,9 @@
 """MergeFall – A Merge & Drop Puzzle Game implementation.
 
-Rules (per spec):
+Rules:
 - Grid: width=5, height=6.
 - Each turn: player chooses a column via action string "drop <col>" (e.g., "drop 0").
-- A tile (next_tile) drops into that column and becomes the active tile for this turn.
+- A tile (next_tile) drops into that column and stacks on existing tiles.
 - Resolve:
     1) Apply gravity (everything falls down).
     2) If the active tile has ANY same-valued orthogonal neighbor (up/down/left/right),
@@ -13,8 +13,9 @@ Rules (per spec):
     3) After absorption, empty cells may cause other tiles to fall (gravity), and the active tile
        may become adjacent to same-valued neighbors again, repeating step (2).
     4) Stop when no absorption is possible.
-- Mandatory merge: if the active tile cannot absorb at least once (combo=0), the game ends immediately.
-- Scoring for the turn: (final_active_value) * combo. If combo=0, gain is 0 (and game over).
+- Game Over: after drop+merge resolves, if any tile still pokes above the visible
+  6-row area (overflow row), the game ends. Merging can save you even on a full column.
+- Scoring for the turn: (final_active_value) * combo. If combo=0, gain is 0.
 - next_tile distribution is dynamic based on current maximum tile on board.
 """
 
@@ -43,7 +44,8 @@ class MergeFall(BaseGame):
         seed: int | None = None,
     ) -> None:
         self.width = int(width)
-        self.height = int(height)
+        self.visible_height = int(height)      # rows the player sees (6)
+        self.height = self.visible_height + 1   # +1 overflow row at the top
         self.rng = random.Random(seed)
         self.board: list[list[int]] = []
         self.score: int = 0
@@ -55,12 +57,16 @@ class MergeFall(BaseGame):
     # ── BaseGame interface ──────────────────────────────────────────
 
     def get_state(self) -> dict[str, Any]:
-        visible_board = [[abs(v) for v in row] for row in self.board]
+        # Only expose the visible rows (skip the overflow row 0)
+        visible_board = [
+            [abs(v) for v in self.board[r]]
+            for r in range(1, self.height)
+        ]
         return {
             "game": self.name,
             "board": deepcopy(visible_board),
             "width": self.width,
-            "height": self.height,
+            "height": self.visible_height,
             "score": self.score,
             "next_tile": self.next_tile,
             "game_over": self.game_over,
@@ -78,8 +84,8 @@ class MergeFall(BaseGame):
     def valid_actions(self) -> list[str]:
         if self.game_over:
             return []
-        cols = [c for c in range(self.width) if self.board[0][c] == 0]
-        return ["drop %d" % c for c in cols]
+        # All columns are always valid — dropping into a full column = overflow = game over.
+        return ["drop %d" % c for c in range(self.width)]
 
     def apply_action(self, action: str) -> dict[str, Any]:
         action = action.strip().lower()
@@ -95,30 +101,28 @@ class MergeFall(BaseGame):
             state["error"] = "Invalid action: %s" % action
             return state
 
+        # Check if column is completely full (no empty cell even in overflow row)
         if self.board[0][col] != 0:
+            # Truly no room at all — cannot even place the tile
             self.game_over = True
             state = self.get_state()
-            state["error"] = "Column %d is full. Game over." % col
+            state["error"] = "Column %d has no room. Game over." % col
             return state
 
-        # Count existing tiles *before* this drop to decide mandatory-merge.
-        tile_count = sum(
-            1 for rr in range(self.height) for cc in range(self.width)
-            if self.board[rr][cc] != 0
-        )
-
+        # Drop the tile (may land in overflow row 0, that's OK for now)
         r = self._drop_active_into_column(col, self.next_tile)
         self._active_pos = (r, col)
-        gained = self._resolve_active_drop(mandatory_merge=tile_count >= 1)
+
+        # Resolve all merges and gravity
+        gained = self._resolve_active_drop()
         self.score += gained
 
-        if self.game_over:
-            return self.get_state()
-
-        self.next_tile = self._sample_next_tile()
-
-        if not self.valid_actions():
+        # NOW check overflow: if any tile remains in row 0, game over
+        if any(self.board[0][c] != 0 for c in range(self.width)):
             self.game_over = True
+
+        if not self.game_over:
+            self.next_tile = self._sample_next_tile()
 
         return self.get_state()
 
@@ -149,7 +153,8 @@ class MergeFall(BaseGame):
                 return r
         raise RuntimeError("Column should not be full.")
 
-    def _resolve_active_drop(self, mandatory_merge: bool = True) -> int:
+    def _resolve_active_drop(self) -> int:
+        """Resolve gravity + absorption chains. Return score gained."""
         if self._active_pos is None:
             return 0
 
@@ -166,10 +171,6 @@ class MergeFall(BaseGame):
 
             neighbors = self._same_value_neighbors(ar, ac, v)
             if not neighbors:
-                if combo == 0 and mandatory_merge:
-                    self._finalize_active()
-                    self.game_over = True
-                    return 0
                 break
 
             for nr, nc in neighbors:
