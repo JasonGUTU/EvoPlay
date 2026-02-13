@@ -1,2 +1,6 @@
-litellm>=1.0.0
+litellm=1.40.0
 requests>=2.31.0
+
+# Note: If you have langchain-openai installed, it may conflict with openai>=2.0.0
+# If you don't need langchain, uninstall it:
+# pip uninstall langchain-openai langchain -y

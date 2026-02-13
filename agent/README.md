@@ -1,6 +1,12 @@
 # Agent Module
 
-This module provides an AI agent that can play games by interacting with the backend API and using a reasoning engine to make decisions. The agent uses **LiteLLM** as a unified interface to support multiple LLM providers, making it easy to switch between different models.
+This module provides an AI agent that can play games by interacting with the backend API and using a reasoning engine to make decisions. 
+
+**Key Design**:
+- **LiteLLM** is used as middleware to provide a unified interface for calling language models
+- **LLM Interface** (`llm.py`) abstracts away provider differences - use this to call any model
+- **VanillaReasoning** is a simple vanilla iterative reasoning implementation (no complex agent structures)
+- Easy to extend with custom reasoning methods
 
 ## Architecture
 
@@ -16,31 +22,34 @@ The agent is designed with a decoupled architecture:
        ▼
 ┌─────────────┐
 │  Reasoning  │  Abstract interface for reasoning engines
-│  (Abstract) │  - Easy to swap different models
+│  (Abstract) │  - Easy to swap different reasoning methods
 └──────┬──────┘
        │
-       └── LiteLLMReasoning (unified interface via LiteLLM)
-           ├── OpenAI (GPT-3.5, GPT-4, etc.)
-           ├── Anthropic (Claude)
-           ├── Google (Gemini)
-           ├── Local models (Ollama, etc.)
-           └── Azure OpenAI, HuggingFace, and more...
+       └── VanillaReasoning (vanilla iterative LLM reasoning)
+           │
+           └── LLM Interface (unified via LiteLLM middleware)
+               ├── OpenAI (GPT-3.5, GPT-4, etc.)
+               ├── Anthropic (Claude)
+               ├── Google (Gemini)
+               ├── Local models (Ollama, etc.)
+               └── Azure OpenAI, HuggingFace, and more...
 ```
 
 ### Key Components
 
 1. **`config.py`**: Centralized configuration management for API keys and settings
-2. **`Reasoning` (Abstract Base Class)**: Defines the interface for reasoning engines
-3. **`reasoning/` folder**: Contains different reasoning implementations:
+2. **`llm.py`**: Unified LLM interface using LiteLLM as middleware - **use this to call language models**
+3. **`Reasoning` (Abstract Base Class)**: Defines the interface for reasoning engines
+4. **`reasoning/` folder**: Contains different reasoning implementations:
    - `base.py`: Abstract base class - **start here if developing a new reasoning engine**
-   - `litellm_reasoning.py`: LiteLLM-based implementation
+   - `vanilla_reasoning.py`: Vanilla iterative LLM reasoning (uses unified LLM interface)
    - `__init__.py`: Exports all reasoning classes
    - **Add your custom reasoning engines here**
-4. **`Agent`**: Main agent class that:
+5. **`Agent`**: Main agent class that:
    - Interacts with backend via HTTP requests
    - Uses reasoning engine to decide actions
    - Manages game loop
-5. **`main.py`**: Entry point with command-line argument support - **register new reasoning methods here**
+6. **`main.py`**: Entry point with command-line argument support - **register new reasoning methods here**
 
 ### Directory Structure
 
@@ -48,6 +57,7 @@ The agent is designed with a decoupled architecture:
 agent/
 ├── __init__.py              # Module initialization
 ├── config.py                # Configuration management
+├── llm.py                   # Unified LLM interface (LiteLLM middleware)
 ├── agent.py                 # Main Agent class
 ├── main.py                  # Entry point (CLI support)
 ├── reasoning.py             # Backward compatibility re-export
@@ -57,7 +67,7 @@ agent/
 └── reasoning/               # Reasoning engines folder
     ├── __init__.py          # Exports all reasoning classes
     ├── base.py              # Abstract base class (Reasoning)
-    ├── litellm_reasoning.py # LiteLLM implementation
+    ├── vanilla_reasoning.py # Vanilla iterative LLM reasoning
     └── [your_reasoning].py  # Add your custom reasoning here
 ```
 
@@ -70,141 +80,218 @@ pip install -r requirements.txt
 
 ## Configuration
 
-### Method 1: Using .env File (Recommended)
+### Method 1: Using .env File (Recommended for API Keys Only)
 
-Create a `.env` file in the project root directory (same level as `agent/` and `backend/`):
+Create a `.env` file in the project root directory (same level as `agent/` and `backend/`) to store your API keys:
 
 ```bash
-# Copy the example file
-cp .env.example .env
-
-# Edit .env and add your API keys
+# Create .env file in project root
+touch .env
+# Or use your preferred editor
 ```
 
-Example `.env` file:
+**Important**: `.env` file should **only contain sensitive information** like API keys. All other configuration (model, game, reasoning method, etc.) should be set via command-line arguments.
+
+Example `.env` file (API keys only):
 ```bash
-# API Keys (choose the provider you want to use)
+# API Keys - choose the provider you want to use
 OPENAI_API_KEY=your-openai-api-key-here
 # ANTHROPIC_API_KEY=your-anthropic-api-key-here
 # GEMINI_API_KEY=your-gemini-api-key-here
 
-# Model Configuration
-MODEL=gpt-3.5-turbo
-API_PROVIDER=openai
-API_BASE=
-
-# Reasoning Method
-REASONING_METHOD=litellm
-
-# Game Configuration
-GAME_NAME=2048
-BACKEND_URL=http://localhost:5001
-FRONTEND_URL=http://localhost:3000
-
-# Agent Settings
-TEMPERATURE=0.7
-MAX_TOKENS=50
-MAX_STEPS=0
-DELAY=1.0
-AUTO_OPEN_BROWSER=false
+# Optional: API base URL for local models (e.g., Ollama)
+# API_BASE=http://localhost:11434
 ```
 
-### Method 2: Environment Variables
+**Note**: Do NOT put game configuration, reasoning method, or agent settings in `.env`. Use command-line arguments instead (see examples below).
 
-You can also set environment variables directly:
+### Method 2: Environment Variables (For API Keys Only)
+
+You can also set API keys as environment variables directly:
 
 ```bash
-# API Keys
+# API Keys only
 export OPENAI_API_KEY='your-openai-key'
 export ANTHROPIC_API_KEY='your-anthropic-key'
 export GEMINI_API_KEY='your-gemini-key'
-
-# Model Configuration
-export MODEL='gpt-3.5-turbo'
-export API_PROVIDER='openai'
-export API_BASE=''  # For local models like Ollama
-
-# Reasoning Method
-export REASONING_METHOD='litellm'
-
-# Game Configuration
-export GAME_NAME='2048'
-export BACKEND_URL='http://localhost:5001'
-export FRONTEND_URL='http://localhost:3000'
-
-# Agent Settings
-export TEMPERATURE='0.7'
-export MAX_TOKENS='50'
-export MAX_STEPS='0'  # 0 means infinite
-export DELAY='1.0'
-export AUTO_OPEN_BROWSER='false'
 ```
+
+**Note**: For all other settings (model, game, reasoning method, etc.), use command-line arguments. Environment variables for non-sensitive settings are supported for backward compatibility but not recommended.
+
+### Using the Unified LLM Interface
+
+The `llm.py` module provides a unified interface for calling language models through LiteLLM middleware. This allows you to call any supported model without worrying about provider-specific differences.
+
+**Basic Usage**:
+```python
+from agent.llm import LLM
+
+# Initialize LLM interface
+llm = LLM(
+    model="gpt-4",
+    api_key="your-api-key",  # Optional if set in .env
+    temperature=0.7,
+    max_tokens=1000
+)
+
+# Simple call with a prompt
+response = llm.simple_call("What is 2+2?")
+print(response)
+
+# Advanced call with message history
+response = llm.call(
+    messages=[
+        {"role": "user", "content": "Hello"},
+        {"role": "assistant", "content": "Hi there!"},
+        {"role": "user", "content": "What's the weather?"}
+    ],
+    system_message="You are a helpful assistant."
+)
+```
+
+**Key Benefits**:
+- Unified API regardless of provider (OpenAI, Anthropic, Google, etc.)
+- Automatic provider detection from model name
+- No need to handle provider-specific differences
+- Easy to switch models without changing code
 
 ### Supported Models
 
-LiteLLM supports many models. Here are some examples:
+LiteLLM supports many models. Here are commonly used models:
 
-**OpenAI:**
-- `gpt-3.5-turbo`
-- `gpt-4`
-- `gpt-4-turbo-preview`
+**⚠️ Important**: Model availability changes frequently. **Please check [OpenAI's official model documentation](https://platform.openai.com/docs/models) for the latest available models.**
+
+**OpenAI (Recommended):**
+- `gpt-4o-mini` - Fast and cost-effective model (default)
+- `gpt-4-turbo` - High-performance reasoning model
+- `gpt-4` - Standard GPT-4 model
+- `o1-preview` / `o1-mini` - OpenAI's reasoning models (if available)
+- **Note**: Check [OpenAI Models](https://platform.openai.com/docs/models) for current availability
 
 **Anthropic (Claude):**
-- `claude-3-opus-20240229`
-- `claude-3-sonnet-20240229`
-- `claude-3-haiku-20240307`
+- `claude-3-5-sonnet-20241022` - Latest Claude model (recommended)
+- `claude-3-opus-20240229` - Most capable Claude model
+- `claude-3-sonnet-20240229` - Balanced performance
+- `claude-3-haiku-20240307` - Fastest and cheapest
 
 **Google:**
-- `gemini/gemini-pro`
-- `gemini/gemini-pro-vision`
+- `gemini/gemini-pro` - Google's Gemini Pro model
+- `gemini/gemini-pro-vision` - With vision capabilities
+- `gemini/gemini-1.5-pro` - Latest Gemini model
 
 **Local Models (Ollama):**
-- `ollama/llama2`
-- `ollama/mistral`
-- `ollama/codellama`
+- `ollama/llama2` - Meta's Llama 2
+- `ollama/llama3` - Meta's Llama 3
+- `ollama/mistral` - Mistral model
+- `ollama/codellama` - Code-focused model
 
 **Azure OpenAI:**
-- `azure/gpt-4`
-- `azure/gpt-35-turbo`
+- `azure/gpt-4` - GPT-4 via Azure
+- `azure/gpt-4-turbo` - GPT-4 Turbo via Azure
 
-See [LiteLLM documentation](https://docs.litellm.ai/docs/providers) for the full list.
+**Other Providers:**
+- See [LiteLLM documentation](https://docs.litellm.ai/docs/providers) for the complete list
+
+**How to Check Available Models:**
+```bash
+# Check OpenAI models via API (requires API key)
+curl https://api.openai.com/v1/models \
+  -H "Authorization: Bearer $OPENAI_API_KEY" | grep '"id"'
+
+# Or visit OpenAI's official documentation:
+# https://platform.openai.com/docs/models
+```
 
 ### Configuration Priority
 
 Configuration is loaded in the following order (highest priority first):
-1. Command-line arguments
+1. **Command-line arguments** (recommended for all non-sensitive settings)
 2. Environment variables
-3. `.env` file
+3. `.env` file (recommended for API keys only)
 4. Default values
+
+**Best Practice**: 
+- Put **API keys** in `.env` file (sensitive information)
+- Use **command-line arguments** for everything else (model, game, reasoning method, etc.)
 
 ## Usage
 
 ### Quick Start
 
+**Complete Startup Sequence** (3 terminals required):
+
 **Step 1: Configure API Key**
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root (same level as `agent/` and `backend/`):
 ```bash
-# Copy the example file
-cp .env.example .env
+# Create .env file
+touch .env
 
 # Edit .env and add your API key
 # OPENAI_API_KEY=your-api-key-here
 ```
 
-**Step 2: Start Backend**
+**Important**: Only put API keys in `.env`. All other settings use command-line arguments.
+
+**Step 2: Start Backend** (Terminal 1)
 ```bash
 cd backend
 python app.py
 ```
+Backend will run on `http://localhost:5001`
 
-**Step 3: Run Agent (in another terminal)**
+**Step 3: Start Frontend** (Terminal 2)
+```bash
+cd frontend
+npm install  # Only needed first time
+npm run dev
+```
+Frontend will run on `http://localhost:3000`
+
+**Step 4: Run Agent** (Terminal 3)
 ```bash
 cd agent
 python main.py
 ```
 
-That's it! The agent will start playing the game using default settings.
+**That's it!** The agent will start playing the game, and you can watch it in the browser at `http://localhost:3000`
+
+**Optional**: Use `--auto-open-browser` to automatically open the frontend:
+```bash
+python main.py --auto-open-browser
+```
+
+### Quick Test
+
+**Minimal test (5 steps)** - You need 3 terminals:
+
+```bash
+# Terminal 1: Start backend
+cd backend
+python app.py
+
+# Terminal 2: Start frontend (optional, for visualization)
+cd frontend
+npm run dev
+
+# Terminal 3: Run agent for 5 steps
+cd agent
+python main.py --max-steps 5 --delay 0.5
+```
+
+**Note**: Frontend is optional but recommended for visualization. If you don't start the frontend, the agent will still work, but you won't be able to see the game in the browser.
+
+**Test with specific model**:
+```bash
+python main.py --model gpt-4o-mini --max-steps 10
+# Or try other models (check availability first):
+python main.py --model gpt-4-turbo --max-steps 10
+```
+
+**Test with auto-open browser**:
+```bash
+python main.py --max-steps 10 --auto-open-browser
+```
 
 ### Basic Usage
 
@@ -229,13 +316,13 @@ python main.py --help
 **Common Examples:**
 
 ```bash
-# Use default settings from .env or environment variables
+# Use default settings (API key from .env, defaults for everything else)
 python main.py
 
-# Specify reasoning method and model
-python main.py --reasoning litellm --model gpt-4
+# Specify model and reasoning method
+python main.py --reasoning vanilla --model gpt-4
 
-# Use different API provider
+# Use different API provider (API key should be in .env)
 python main.py --api-provider anthropic --model claude-3-sonnet-20240229
 
 # Play different game
@@ -247,18 +334,20 @@ python main.py --auto-open-browser
 # Limit steps and set delay
 python main.py --max-steps 100 --delay 0.5
 
-# Full example with all options
+# Full example with all options (API key from .env)
 python main.py \
-    --reasoning litellm \
+    --reasoning vanilla \
     --model gpt-4 \
     --api-provider openai \
-    --api-key your-api-key \
     --temperature 0.8 \
     --max-tokens 100 \
     --game 2048 \
     --max-steps 50 \
     --delay 0.5 \
     --auto-open-browser
+
+# Override API key via command line (if not in .env)
+python main.py --api-key your-api-key-here --model gpt-4
 ```
 
 ### Switching Models via Command Line
@@ -287,10 +376,10 @@ python main.py --model gemini/gemini-pro --api-provider gemini
 
 ```python
 from agent.agent import Agent
-from agent.reasoning import LiteLLMReasoning
+from agent.reasoning import VanillaReasoning
 
 # Initialize reasoning engine with any supported model
-reasoning = LiteLLMReasoning(
+reasoning = VanillaReasoning(
     model="gpt-4",  # or "claude-3-opus-20240229", "ollama/llama2", etc.
     api_key="your-api-key",  # Optional if set via env vars
     temperature=0.7,
@@ -310,20 +399,26 @@ agent.run_loop(max_steps=10, delay=1.0)
 
 ### Backward Compatibility
 
-The old `GPTReasoning` class is still available as an alias:
+**Backward Compatibility**: Old class names still work:
 ```python
-from agent.reasoning import GPTReasoning  # Same as LiteLLMReasoning
+from agent.reasoning import LiteLLMReasoning  # Alias for VanillaReasoning
+from agent.reasoning import GPTReasoning      # Alias for VanillaReasoning
 ```
 
 ## How It Works
 
 1. **Get State**: Agent fetches current game state from backend
 2. **Get Valid Actions**: Agent gets list of valid actions
-3. **Reason**: Agent uses reasoning engine (via LiteLLM) to decide on best action
-4. **Apply Action**: Agent sends action to backend
-5. **Repeat**: Steps 1-4 are repeated until game over or max steps reached
+3. **Get Rules**: Agent fetches game rules from backend
+4. **Reason**: Agent uses reasoning engine to decide on best action
+   - VanillaReasoning: Simple iterative process - build prompt, call LLM via unified interface, return action
+5. **Apply Action**: Agent sends action to backend
+6. **Repeat**: Steps 1-5 are repeated until game over or max steps reached
 
-LiteLLM acts as a unified interface, automatically handling the differences between various LLM providers, so you can switch models without changing any code.
+**VanillaReasoning** is a vanilla iterative reasoning implementation:
+- No complex agent structures
+- Simple: prompt → LLM call → action
+- Uses unified LLM interface (via LiteLLM middleware) to support any model provider
 
 ## Developing a New Reasoning Engine
 

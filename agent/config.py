@@ -21,8 +21,8 @@ class Config:
     DEFAULT_BACKEND_URL = "http://localhost:5001"
     DEFAULT_FRONTEND_URL = "http://localhost:3000"
     DEFAULT_GAME_NAME = "2048"
-    DEFAULT_REASONING_METHOD = "litellm"
-    DEFAULT_MODEL = "gpt-3.5-turbo"
+    DEFAULT_REASONING_METHOD = "vanilla"
+    DEFAULT_MODEL = "gpt-4o-mini"  # Use gpt-4o-mini as default (more stable availability)
     DEFAULT_API_PROVIDER = "openai"
     DEFAULT_TEMPERATURE = 0.7
     DEFAULT_MAX_TOKENS = 50
@@ -36,13 +36,42 @@ class Config:
     
     def _load_env_file(self) -> None:
         """Load environment variables from .env file if it exists."""
-        # Look for .env file in project root (agent/../.env)
-        project_root = Path(__file__).resolve().parent.parent
-        env_file = project_root / ".env"
+        # Keys that should NOT be loaded from .env (only API keys should be in .env)
+        # These should be set via command-line arguments instead
+        ignored_keys = {
+            "MODEL", "GAME_NAME", "REASONING_METHOD", "API_PROVIDER",
+            "TEMPERATURE", "MAX_TOKENS", "MAX_STEPS", "DELAY",
+            "AUTO_OPEN_BROWSER", "BACKEND_URL", "FRONTEND_URL", "SESSION_ID"
+        }
         
-        if env_file.exists():
+        # First, check if any ignored keys are already set from .env (from previous runs)
+        # and clear them if they match values that might be in .env
+        for key in ignored_keys:
+            if key in os.environ:
+                # Check if this might have come from .env by checking if .env contains it
+                # We'll clear it and let command-line args or defaults take precedence
+                pass  # We'll handle this after reading .env
+        
+        # Look for .env file in multiple locations (priority order):
+        # 1. Project root (agent/../.env) - recommended
+        # 2. Agent directory (agent/.env) - fallback
+        project_root = Path(__file__).resolve().parent.parent
+        agent_dir = Path(__file__).resolve().parent
+        
+        env_file = None
+        # Try project root first
+        if (project_root / ".env").exists():
+            env_file = project_root / ".env"
+        # Fallback to agent directory
+        elif (agent_dir / ".env").exists():
+            env_file = agent_dir / ".env"
+        
+        if env_file:
+            # Read .env file to check for ignored keys
+            env_content = {}
             with open(env_file, "r", encoding="utf-8") as f:
-                for line in f:
+                for line_num, line in enumerate(f, 1):
+                    original_line = line
                     line = line.strip()
                     # Skip comments and empty lines
                     if not line or line.startswith("#"):
@@ -52,9 +81,35 @@ class Config:
                         key, value = line.split("=", 1)
                         key = key.strip()
                         value = value.strip().strip('"').strip("'")
-                        # Only set if not already in environment
-                        if key not in os.environ:
-                            os.environ[key] = value
+                        env_content[key] = value
+            
+            # Debug: Print what we actually read from .env
+            if env_content:
+                print(f"DEBUG: Read {len(env_content)} keys from .env file ({env_file}):")
+                for key in sorted(env_content.keys()):
+                    print(f"  {key}={env_content[key][:20]}..." if len(env_content[key]) > 20 else f"  {key}={env_content[key]}")
+            else:
+                print(f"DEBUG: .env file ({env_file}) is empty or contains only comments/whitespace")
+            
+            # Clear ignored keys from environment if they match .env values
+            for key in ignored_keys:
+                if key in env_content and key in os.environ:
+                    if os.environ[key] == env_content[key]:
+                        # This was likely set from .env, clear it
+                        del os.environ[key]
+                        print(f"Warning: '{key}' was found in .env file and has been cleared. "
+                              f"Please use command-line arguments (--{key.lower().replace('_', '-')}) instead.")
+            
+            # Now load only non-ignored keys
+            # Only warn about keys that are actually in the .env file
+            for key, value in env_content.items():
+                if key not in ignored_keys and key not in os.environ:
+                    os.environ[key] = value
+                elif key in ignored_keys:
+                    # Warn if non-API-key settings are found in .env
+                    print(f"Warning: '{key}' found in .env file. "
+                          f"Please use command-line arguments instead. "
+                          f"Ignoring this setting.")
     
     # API Key getters
     def get_openai_api_key(self) -> str | None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import os
 import time
@@ -28,16 +29,25 @@ class BaseGame(ABC):
       - _log / _steps / _start_time are managed automatically.
       - Subclasses call self._record_log(action, state) after each action.
       - get_log_info() returns {log, steps, elapsed_seconds}.
-      - Every game session writes to  logs/<game>/<timestamp>.jsonl
+      - Every game session writes to logs/<game>/<session_id>.csv (CSV format)
+      - Log file is created lazily on first log entry (avoids empty files)
+      - CSV format: step, time, action, score, game_over, board (board stored as JSON string)
     """
 
     # Subclasses should set  name = "xxx"
     name: str = "unknown"
+    
+    # Session ID for log file naming (set by backend when creating game instance)
+    _session_id: str | None = None
 
     # ── Log internals ───────────────────────────────────────────────
 
+    def set_session_id(self, session_id: str) -> None:
+        """Set session ID for this game instance (used for log file naming)."""
+        self._session_id = session_id
+
     def _reset_log(self) -> None:
-        """Initialise (or reset) the in-memory log and open a new log file."""
+        """Initialise (or reset) the in-memory log. Log file is created lazily on first write."""
         self._log: list[dict[str, Any]] = []
         self._steps: int = 0
         self._start_time: float | None = None
@@ -48,13 +58,32 @@ class BaseGame(ABC):
                 self._log_file.close()
             except Exception:
                 pass
+        self._log_file = None
+        self._log_path = None
 
-        # Create a new log file: logs/<game>/20260213_153045.jsonl
+    def _ensure_log_file(self) -> None:
+        """Create log file if it doesn't exist yet. Called lazily on first log entry."""
+        if self._log_file is not None:
+            return
+        
+        if not self._session_id:
+            # Fallback to timestamp if session_id not set (shouldn't happen in normal flow)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            log_filename = f"{ts}.csv"
+        else:
+            # Use session_id as filename (sanitize for filesystem)
+            # Replace characters that might be problematic in filenames
+            safe_session_id = self._session_id.replace("/", "_").replace("\\", "_")
+            log_filename = f"{safe_session_id}.csv"
+        
         game_log_dir = LOG_DIR / self.name
         game_log_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        self._log_path = game_log_dir / ("%s.jsonl" % ts)
-        self._log_file = open(self._log_path, "w", encoding="utf-8")
+        self._log_path = game_log_dir / log_filename
+        self._log_file = open(self._log_path, "w", encoding="utf-8", newline="")
+        
+        # Write CSV header
+        writer = csv.writer(self._log_file)
+        writer.writerow(["step", "time", "action", "score", "game_over", "board"])
 
     def _record_log(self, action: str, state: dict[str, Any]) -> None:
         """Append one log entry to memory and flush to disk."""
@@ -73,9 +102,22 @@ class BaseGame(ABC):
         }
         self._log.append(entry)
 
-        # Write to file (one JSON object per line)
-        if hasattr(self, "_log_file") and self._log_file is not None:
-            self._log_file.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        # Create log file lazily on first write (avoids empty files)
+        self._ensure_log_file()
+
+        # Write to CSV file
+        if self._log_file is not None:
+            writer = csv.writer(self._log_file)
+            # Convert board to JSON string for CSV storage
+            board_str = json.dumps(entry["board"], ensure_ascii=False) if entry["board"] else ""
+            writer.writerow([
+                entry["step"],
+                entry["time"],
+                entry["action"],
+                entry["score"],
+                entry["game_over"],
+                board_str
+            ])
             self._log_file.flush()
 
     def get_log_info(self) -> dict[str, Any]:

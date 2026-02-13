@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from .base import Reasoning
-from .litellm_reasoning import LiteLLMReasoning
+from .vanilla_reasoning import VanillaReasoning
 
-# Backward compatibility alias
-GPTReasoning = LiteLLMReasoning
+# Backward compatibility aliases
+LiteLLMReasoning = VanillaReasoning
+GPTReasoning = VanillaReasoning
 
 __all__ = [
     "Reasoning",
-    "LiteLLMReasoning",
-    "GPTReasoning",
+    "VanillaReasoning",
+    "LiteLLMReasoning",  # Backward compatibility
+    "GPTReasoning",  # Backward compatibility
 ]

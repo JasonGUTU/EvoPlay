@@ -29,11 +29,14 @@ async function fetchState() {
     sessionId.value = data.session_id;
   }
   applyState(data);
+  // Also update log when fetching state (for polling to detect Agent actions)
+  logRef.value?.fetchLog();
 }
 
 async function sendAction(move) {
   lastAction.value = move;
   error.value = "";
+  lastUserActionTime = Date.now(); // Record user action time
   const sid = sessionId.value || getSessionId("2048");
   const url = addSessionToUrl(`${API}/action?move=${move}`, sid);
   const res = await fetch(url);
@@ -70,6 +73,14 @@ function applyState(state) {
   gameOver.value = state.game_over;
   won.value = state.won;
   validActions.value = state.valid_actions || [];
+  
+  // Stop polling if game is over
+  if (state.game_over) {
+    stopPolling();
+  } else {
+    // Ensure polling is active
+    startPolling();
+  }
 }
 
 // ── Keyboard handling ──────────────────────────────────────────────
@@ -93,13 +104,48 @@ function onKeyDown(e) {
   }
 }
 
+// Polling interval to check for state changes (e.g., from Agent)
+let pollingInterval = null;
+const POLLING_INTERVAL_MS = 1000; // Poll every 1 second
+let lastUserActionTime = 0;
+const USER_ACTION_COOLDOWN_MS = 500; // Don't poll immediately after user action
+
+function startPolling() {
+  // Only poll if game is not over and interval not already set
+  if (!pollingInterval && !gameOver.value) {
+    pollingInterval = setInterval(async () => {
+      // Don't poll if user just performed an action (cooldown period)
+      const timeSinceLastAction = Date.now() - lastUserActionTime;
+      if (timeSinceLastAction < USER_ACTION_COOLDOWN_MS) {
+        return;
+      }
+      
+      if (!gameOver.value) {
+        await fetchState();
+      } else {
+        stopPolling();
+      }
+    }, POLLING_INTERVAL_MS);
+  }
+}
+
+function stopPolling() {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+  }
+}
+
 onMounted(() => {
   fetchState();
   window.addEventListener("keydown", onKeyDown);
+  // Start polling to detect Agent actions
+  startPolling();
 });
 
 onUnmounted(() => {
   window.removeEventListener("keydown", onKeyDown);
+  stopPolling();
 });
 
 // ── Tile colours ───────────────────────────────────────────────────

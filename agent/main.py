@@ -6,9 +6,18 @@ import argparse
 import sys
 import webbrowser
 import time
+from pathlib import Path
+
+# Add parent directory to path so we can import agent module
+# This allows running from both project root and agent/ directory
+_agent_dir = Path(__file__).resolve().parent
+_project_root = _agent_dir.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 from agent.agent import Agent
 from agent.config import config
-from agent.reasoning import Reasoning, LiteLLMReasoning
+from agent.reasoning import Reasoning, VanillaReasoning
 
 
 def create_reasoning(
@@ -51,8 +60,8 @@ def create_reasoning(
     if max_tokens is None:
         max_tokens = config.get_max_tokens()
     
-    if method_lower == "litellm":
-        return LiteLLMReasoning(
+    if method_lower == "litellm" or method_lower == "vanilla":
+        return VanillaReasoning(
             model=model,
             api_key=api_key,
             api_provider=api_provider,
@@ -63,7 +72,7 @@ def create_reasoning(
     else:
         raise ValueError(
             f"Unknown reasoning method: {method}. "
-            f"Available methods: litellm"
+            f"Available methods: vanilla (or litellm for backward compatibility)"
         )
 
 
@@ -99,7 +108,7 @@ Examples:
         "--reasoning",
         type=str,
         default=config.get_reasoning_method(),
-        help=f"Reasoning method to use (default: {config.get_reasoning_method()})",
+        help=f"Reasoning method to use: vanilla (default: {config.get_reasoning_method()})",
     )
     parser.add_argument(
         "--model",
@@ -209,15 +218,23 @@ def main():
         print(f"Using model: {args.model}")
         if args.api_provider:
             print(f"Using API provider: {args.api_provider}")
+        
+        # Debug: Check if MODEL env var is set (should not be in .env)
+        import os
+        if os.getenv("MODEL"):
+            print(f"\n⚠️  Warning: MODEL environment variable is set to: {os.getenv('MODEL')}")
+            print("   This will override the default. Consider unsetting it:")
+            print("   unset MODEL")
+            print("   Or use --model argument to override.")
     except Exception as e:
         print(f"Error initializing reasoning engine: {e}")
         print("\nPlease check your configuration:")
-        print("  1. Set API key in .env file or environment variables")
+        print("  1. Set API key in .env file or use --api-key argument")
         print("  2. Verify the reasoning method and model name are correct")
-        print("\nExample .env file:")
+        print("\nExample .env file (API keys only):")
         print("  OPENAI_API_KEY=your-api-key-here")
-        print("  MODEL=gpt-3.5-turbo")
-        print("  REASONING_METHOD=litellm")
+        print("\nUse command-line arguments for other settings:")
+        print("  python main.py --model gpt-4 --game 2048 --reasoning litellm")
         sys.exit(1)
     
     # Initialize agent
@@ -228,11 +245,11 @@ def main():
         session_id=args.session_id,
     )
     
-    # Get session_id by calling get_state (this will initialize the session)
+    # Initialize session by calling reset (this will create a new game session)
     if args.auto_open_browser:
         print("\nInitializing session...")
         try:
-            state = agent.get_state()
+            state = agent.reset_game()  # Use reset_game to initialize session
             agent_session_id = agent.session_id
             if agent_session_id:
                 # Construct the frontend URL with session_id and game parameters

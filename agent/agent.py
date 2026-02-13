@@ -47,22 +47,19 @@ class Agent:
         Returns:
             Game state dictionary
         """
+        # If no session_id, initialize by calling reset first
+        # Backend /state endpoint requires session_id, but /reset can generate one
         if not self.session_id:
-            # First call - get state to initialize session
-            url = f"{self.backend_url}/api/game/{self.game_name}/state"
-            # Backend will generate session_id if not provided
-            response = requests.get(url, params={"session_id": ""})
-        else:
-            url = f"{self.backend_url}/api/game/{self.game_name}/state"
-            response = requests.get(url, params={"session_id": self.session_id})
+            self.reset_game()
         
+        url = f"{self.backend_url}/api/game/{self.game_name}/state"
+        response = requests.get(url, params={"session_id": self.session_id})
         response.raise_for_status()
         state = response.json()
         
-        # Store session_id from response if we don't have one
-        if not self.session_id and "session_id" in state:
+        # Update session_id if changed
+        if "session_id" in state:
             self.session_id = state["session_id"]
-            print(f"Initialized session_id: {self.session_id}")
         
         return state
     
@@ -126,7 +123,7 @@ class Agent:
     
     def reset_game(self) -> dict[str, Any]:
         """
-        Reset the game to initial state.
+        Reset the game to initial state and initialize session if needed.
         
         Returns:
             Initial game state dictionary
@@ -136,13 +133,15 @@ class Agent:
         if self.session_id:
             params["session_id"] = self.session_id
         
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params if params else None)
         response.raise_for_status()
         state = response.json()
         
-        # Update session_id
+        # Store session_id from response (reset endpoint can generate new session)
         if "session_id" in state:
             self.session_id = state["session_id"]
+            if not params:  # If we didn't have session_id before
+                print(f"Initialized session_id: {self.session_id}")
         
         self.step_count = 0
         return state

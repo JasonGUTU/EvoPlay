@@ -75,7 +75,10 @@ def _get_game(name: str, session_id: str | None = None, require_session: bool = 
     if key not in sessions:
         if name not in GAMES:
             return None, None
-        sessions[key] = GAMES[name]()
+        game_instance = GAMES[name]()
+        # Set session_id for log file naming
+        game_instance.set_session_id(session_id)
+        sessions[key] = game_instance
         log.info("Created new session for game '%s' with session_id '%s'", name, session_id)
     
     return sessions[key], session_id
