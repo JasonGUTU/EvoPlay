@@ -77,6 +77,36 @@ class Game2048(BaseGame):
             if self._can_move(direction):
                 actions.append(direction)
         return actions
+    
+    def get_rules(self) -> str:
+        """Return the game rules description."""
+        return """2048 Game Rules
+
+OBJECTIVE:
+The goal is to slide numbered tiles on a 4x4 grid to combine them and create a tile with the number 2048. You win when you reach 2048, but you can continue playing to achieve higher scores.
+
+GAMEPLAY:
+- You start with a 4x4 grid containing two tiles (either 2 or 4).
+- On each turn, you slide all tiles in one of four directions: up, down, left, or right.
+- When you slide, all tiles move as far as possible in that direction until they hit the edge or another tile.
+- If two tiles with the same number collide while moving, they merge into a single tile with double the value.
+- After each move, a new tile (either 2 with 90% probability or 4 with 10% probability) appears in a random empty cell.
+
+AVAILABLE ACTIONS:
+You can choose one of four directions:
+- "up": Slide all tiles upward
+- "down": Slide all tiles downward
+- "left": Slide all tiles to the left
+- "right": Slide all tiles to the right
+
+Note: Only actions that would actually change the board state are valid. If a direction would not move any tiles, that action is not available.
+
+GAME OVER CONDITIONS:
+The game ends when:
+1. The board is completely filled with tiles, AND
+2. No valid moves are possible (no tiles can merge in any direction)
+
+When the game is over, you cannot make any more moves. Your final score is the sum of all merged tile values."""
 
     # ── Internal helpers ────────────────────────────────────────────
 

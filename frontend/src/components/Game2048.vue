@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from "vue";
 import GameLog from "./GameLog.vue";
-import { getSessionId, resetSessionId, addSessionToUrl } from "../utils/session.js";
+import { getSessionId, resetSessionId, addSessionToUrl, setSessionIdFromUrl } from "../utils/session.js";
 
 const API = "/api/game/2048";
 const logRef = ref(null);
@@ -18,7 +18,9 @@ const lastAction = ref("");
 // ── API helpers ────────────────────────────────────────────────────
 
 async function fetchState() {
-  const sid = getSessionId("2048");
+  // Check if session_id is provided in URL, if so, use it
+  const urlSessionId = setSessionIdFromUrl("2048");
+  const sid = urlSessionId || getSessionId("2048");
   sessionId.value = sid;
   const url = addSessionToUrl(`${API}/state`, sid);
   const res = await fetch(url);

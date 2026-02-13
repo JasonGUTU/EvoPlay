@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 import requests
 from typing import Any
-from .reasoning import Reasoning
+from agent.reasoning import Reasoning
 
 
 class Agent:
@@ -83,6 +83,19 @@ class Agent:
         data = response.json()
         return data.get("valid_actions", [])
     
+    def get_rules(self) -> str:
+        """
+        Get game rules description from backend.
+        
+        Returns:
+            Game rules description string
+        """
+        url = f"{self.backend_url}/api/game/{self.game_name}/rules"
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("rules", "")
+    
     def apply_action(self, action: str) -> dict[str, Any]:
         """
         Apply an action to the game via backend.
@@ -156,8 +169,11 @@ class Agent:
             print("No valid actions available")
             return state
         
-        # Step 3: Use reasoning engine to decide on action
-        action = self.reasoning.reason(state, valid_actions)
+        # Step 3: Get game rules
+        rules = self.get_rules()
+        
+        # Step 4: Use reasoning engine to decide on action
+        action = self.reasoning.reason(state, valid_actions, rules)
         
         # Step 4: Apply the action
         print(f"Step {self.step_count + 1}: Choosing action '{action}'")

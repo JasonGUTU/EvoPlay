@@ -32,6 +32,16 @@ onMounted(async () => {
     const res = await fetch("/api/games");
     const data = await res.json();
     games.value = data.games;
+    
+    // Check URL parameters for game and session_id
+    const params = new URLSearchParams(window.location.search);
+    const urlGame = params.get("game");
+    const urlSessionId = params.get("session_id");
+    
+    // If game is specified in URL, select it
+    if (urlGame && games.value.includes(urlGame)) {
+      currentGame.value = urlGame;
+    }
   } catch (e) {
     console.error("Failed to fetch games list", e);
   }

@@ -111,3 +111,15 @@ class BaseGame(ABC):
     @abstractmethod
     def valid_actions(self) -> list[str]:
         """Return the list of action strings that are currently legal."""
+    
+    @abstractmethod
+    def get_rules(self) -> str:
+        """
+        Return a string describing the game rules.
+        
+        This should include:
+        - Game objective and gameplay
+        - Specific rules
+        - Available actions and how to use them
+        - Game over conditions
+        """

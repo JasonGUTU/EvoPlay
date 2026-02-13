@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, nextTick } from "vue";
 import GameLog from "./GameLog.vue";
-import { getSessionId, resetSessionId, addSessionToUrl } from "../utils/session.js";
+import { getSessionId, resetSessionId, addSessionToUrl, setSessionIdFromUrl } from "../utils/session.js";
 
 const API = "/api/game/mergefall";
 const logRef = ref(null);
@@ -36,7 +36,9 @@ function initAnimGrid() {
 // ── API helpers ────────────────────────────────────────────────────
 
 async function fetchState() {
-  const sid = getSessionId("mergefall");
+  // Check if session_id is provided in URL, if so, use it
+  const urlSessionId = setSessionIdFromUrl("mergefall");
+  const sid = urlSessionId || getSessionId("mergefall");
   sessionId.value = sid;
   const url = addSessionToUrl(`${API}/state`, sid);
   const res = await fetch(url);

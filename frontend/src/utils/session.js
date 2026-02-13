@@ -36,3 +36,24 @@ export function addSessionToUrl(url, sessionId) {
   const separator = url.includes("?") ? "&" : "?";
   return `${url}${separator}session_id=${encodeURIComponent(sessionId)}`;
 }
+
+/**
+ * Get session_id from URL query parameters.
+ */
+export function getSessionIdFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("session_id");
+}
+
+/**
+ * Set session_id in localStorage for a specific game (if provided in URL).
+ */
+export function setSessionIdFromUrl(gameName) {
+  const urlSessionId = getSessionIdFromUrl();
+  if (urlSessionId) {
+    const key = STORAGE_KEY_PREFIX + gameName;
+    localStorage.setItem(key, urlSessionId);
+    return urlSessionId;
+  }
+  return null;
+}

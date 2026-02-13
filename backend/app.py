@@ -174,6 +174,18 @@ def game_log(name: str):
     return jsonify(log_info)
 
 
+@app.get("/api/game/<name>/rules")
+def game_rules(name: str):
+    """Return the game rules description. Does not require session_id."""
+    if name not in GAMES:
+        return jsonify({"error": f"Unknown game: {name}"}), 404
+    
+    # Create a temporary game instance to get rules (rules don't depend on session state)
+    game_instance = GAMES[name]()
+    rules = game_instance.get_rules()
+    return jsonify({"game": name, "rules": rules})
+
+
 # ── Entry point ─────────────────────────────────────────────────────
 
 if __name__ == "__main__":

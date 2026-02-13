@@ -88,6 +88,41 @@ class MergeFall(BaseGame):
             return []
         # All columns are always valid — dropping into a full column = overflow = game over.
         return ["drop %d" % c for c in range(self.width)]
+    
+    def get_rules(self) -> str:
+        """Return the game rules description."""
+        return """MergeFall Game Rules
+
+OBJECTIVE:
+Drop numbered tiles into columns to create chains of merges and combos. Your goal is to achieve the highest score possible by strategically placing tiles and triggering cascading merges.
+
+GAMEPLAY:
+- You have a 5x6 grid (5 columns, 6 visible rows).
+- Each turn, you choose a column (0-4) to drop the next tile into.
+- The tile falls down the column and lands on top of existing tiles or at the bottom.
+- After dropping, the game automatically resolves merges and gravity:
+  1. Gravity: All tiles fall down to fill empty spaces.
+  2. Merging: If the dropped tile has any adjacent tiles (up/down/left/right) with the same value, it absorbs all such neighbors in its immediate 4-neighborhood.
+  3. The merged tile's value upgrades based on how many tiles were absorbed.
+  4. After merging, gravity applies again, and the process repeats until no more merges are possible.
+- Your score increases based on the final merged tile value multiplied by the combo count.
+
+AVAILABLE ACTIONS:
+You can drop a tile into any of the 5 columns using the format "drop <column_number>":
+- "drop 0": Drop into the leftmost column (column 0)
+- "drop 1": Drop into the second column (column 1)
+- "drop 2": Drop into the middle column (column 2)
+- "drop 3": Drop into the fourth column (column 3)
+- "drop 4": Drop into the rightmost column (column 4)
+
+You can also use just the number: "0", "1", "2", "3", or "4" as shorthand.
+
+GAME OVER CONDITIONS:
+The game ends when:
+- After dropping a tile and resolving all merges, any tile remains in the overflow row (above the visible 6 rows).
+- This happens when a column becomes completely full and cannot accommodate the dropped tile.
+
+Note: Even if a column looks full, dropping into it might trigger merges that clear space. However, if the column is truly full (including the overflow row), the game ends immediately."""
 
     def apply_action(self, action: str) -> dict[str, Any]:
         action = action.strip().lower()
