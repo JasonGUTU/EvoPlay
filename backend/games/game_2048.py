@@ -21,6 +21,7 @@ class Game2048(BaseGame):
         self.score: int = 0
         self.game_over: bool = False
         self.won: bool = False
+        self._reset_log()
         self.reset()
 
     # ── BaseGame interface ──────────────────────────────────────────
@@ -54,13 +55,16 @@ class Game2048(BaseGame):
             if not self._has_moves():
                 self.game_over = True
 
-        return self.get_state()
+        state = self.get_state()
+        self._record_log(action, state)
+        return state
 
     def reset(self) -> dict[str, Any]:
         self.board = [[0] * GRID_SIZE for _ in range(GRID_SIZE)]
         self.score = 0
         self.game_over = False
         self.won = False
+        self._reset_log()
         self._spawn_tile()
         self._spawn_tile()
         return self.get_state()

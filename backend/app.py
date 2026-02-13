@@ -118,6 +118,15 @@ def game_valid_actions(name: str):
     return jsonify({"valid_actions": game.valid_actions()})
 
 
+@app.get("/api/game/<name>/log")
+def game_log(name: str):
+    """Return the operation log for the current session."""
+    game = _get_game(name)
+    if game is None:
+        return jsonify({"error": f"Unknown game: {name}"}), 404
+    return jsonify(game.get_log_info())
+
+
 # ── Entry point ─────────────────────────────────────────────────────
 
 if __name__ == "__main__":
