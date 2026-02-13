@@ -1,7 +1,9 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, nextTick } from "vue";
+import GameLog from "./GameLog.vue";
 
 const API = "/api/game/mergefall";
+const logRef = ref(null);
 
 const board = ref([]);
 const width = ref(5);
@@ -55,6 +57,7 @@ async function dropInColumn(col) {
   if (gain > 0) gainKey.value++;
 
   applyState(data, true, oldBoard, col);
+  logRef.value?.fetchLog();
 
   // Allow next action after animations settle
   setTimeout(() => {
@@ -68,6 +71,7 @@ async function resetGame() {
   particles.splice(0);
   const res = await fetch(`${API}/reset`);
   applyState(await res.json(), false);
+  logRef.value?.fetchLog();
 }
 
 function applyState(state, animate = false, oldBoard = null, dropCol = -1) {
@@ -276,6 +280,9 @@ function particleStyle(p) {
 
     <!-- Hint -->
     <p class="hint">Click a column or press 1-5 to drop</p>
+
+    <!-- Log -->
+    <GameLog ref="logRef" game-name="mergefall" />
   </div>
 </template>
 

@@ -52,6 +52,7 @@ class MergeFall(BaseGame):
         self.game_over: bool = False
         self.next_tile: int = 2
         self._active_pos: Tuple[int, int] | None = None
+        self._reset_log()
         self.reset()
 
     # ── BaseGame interface ──────────────────────────────────────────
@@ -78,6 +79,7 @@ class MergeFall(BaseGame):
         self.score = 0
         self.game_over = False
         self._active_pos = None
+        self._reset_log()
         self.next_tile = self._sample_next_tile()
         return self.get_state()
 
@@ -124,7 +126,9 @@ class MergeFall(BaseGame):
         if not self.game_over:
             self.next_tile = self._sample_next_tile()
 
-        return self.get_state()
+        state = self.get_state()
+        self._record_log(action, state)
+        return state
 
     # ── Action parsing ──────────────────────────────────────────────
 

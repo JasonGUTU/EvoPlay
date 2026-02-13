@@ -1,7 +1,9 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from "vue";
+import GameLog from "./GameLog.vue";
 
 const API = "/api/game/2048";
+const logRef = ref(null);
 
 const board = ref([]);
 const score = ref(0);
@@ -27,6 +29,7 @@ async function sendAction(move) {
     error.value = data.error;
   }
   applyState(data);
+  logRef.value?.fetchLog();
 }
 
 async function resetGame() {
@@ -34,6 +37,7 @@ async function resetGame() {
   error.value = "";
   const res = await fetch(`${API}/reset`);
   applyState(await res.json());
+  logRef.value?.fetchLog();
 }
 
 function applyState(state) {
@@ -165,7 +169,9 @@ function tileStyle(value) {
 
     <!-- Hint for keyboard -->
     <p class="hint">Use arrow keys or WASD to play</p>
-    <p class="hint last-action" v-if="lastAction">Last action: {{ lastAction }}</p>
+
+    <!-- Log -->
+    <GameLog ref="logRef" game-name="2048" />
   </div>
 </template>
 
