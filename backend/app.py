@@ -10,6 +10,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from games.game_2048 import Game2048
+from games.game_mergefall import MergeFall
 
 # ── Logging ─────────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ CORS(app)
 # Registry: add more games here.
 GAMES: dict[str, type] = {
     "2048": Game2048,
+    "mergefall": MergeFall,
 }
 
 # Active game sessions keyed by game name (single-player for now).

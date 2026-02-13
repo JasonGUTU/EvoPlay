@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import Game2048 from "./components/Game2048.vue";
+import GameMergeFall from "./components/GameMergeFall.vue";
 
 const games = ref([]);
 const selectedGame = ref("2048");
@@ -31,6 +32,7 @@ onMounted(async () => {
 
     <main>
       <Game2048 v-if="selectedGame === '2048'" />
+      <GameMergeFall v-else-if="selectedGame === 'mergefall'" />
     </main>
   </div>
 </template>
@@ -44,8 +46,8 @@ onMounted(async () => {
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background: #faf8ef;
-  color: #776e65;
+  background: #0f172a;
+  color: #e2e8f0;
 }
 
 .app {
@@ -64,15 +66,15 @@ header {
 header h1 {
   font-size: 2rem;
   font-weight: 700;
-  color: #776e65;
+  color: #e2e8f0;
 }
 
 select {
   padding: 6px 12px;
   border-radius: 6px;
-  border: 2px solid #bbada0;
+  border: 2px solid #475569;
   font-size: 1rem;
-  background: #fff;
-  color: #776e65;
+  background: #1e293b;
+  color: #e2e8f0;
 }
 </style>
