@@ -4,6 +4,9 @@ import Game2048 from "./components/Game2048.vue";
 import GameMergeFall from "./components/GameMergeFall.vue";
 import GameNutsBolts from "./components/GameNutsBolts.vue";
 import GameSokoban from "./components/GameSokoban.vue";
+import GameFourInARow from "./components/GameFourInARow.vue";
+import GameOthello from "./components/GameOthello.vue";
+import GameTicTacToe from "./components/GameTicTacToe.vue";
 
 const games = ref([]);
 const currentGame = ref(null); // null = home menu
@@ -29,7 +32,41 @@ const gameInfo = {
     desc: "Push crates to their designated goals!",
     icon: "📦",
   },
+  fourinarow: {
+    title: "Four in a Row",
+    desc: "Drop pieces, get 4 in a line — beat the bot!",
+    icon: "🔴",
+  },
+  othello: {
+    title: "Othello",
+    desc: "Flip your opponent's pieces — control the board!",
+    icon: "⚫",
+  },
+  tictactoe: {
+    title: "Tic Tac Toe",
+    desc: "Get 3 in a row — can you beat the perfect bot?",
+    icon: "❌",
+  },
 };
+
+const categories = [
+  {
+    label: "2ⁿ Games",
+    games: ["2048", "mergefall"],
+  },
+  {
+    label: "Puzzle Games",
+    games: ["nuts_bolts", "sokoban"],
+  },
+  {
+    label: "1v1 vs Bot",
+    games: ["fourinarow", "othello", "tictactoe"],
+  },
+  {
+    label: "Coming Soon",
+    games: [],
+  },
+];
 
 function selectGame(name) {
   currentGame.value = name;
@@ -69,17 +106,28 @@ onMounted(async () => {
         <p class="subtitle">Pick a game to play</p>
       </header>
 
-      <div class="game-grid">
-        <button
-          v-for="g in games"
-          :key="g"
-          class="game-card"
-          @click="selectGame(g)"
-        >
-          <span class="game-icon">{{ gameInfo[g]?.icon || '🎮' }}</span>
-          <span class="game-title">{{ gameInfo[g]?.title || g }}</span>
-          <span class="game-desc">{{ gameInfo[g]?.desc || '' }}</span>
-        </button>
+      <div class="categories">
+        <div v-for="cat in categories" :key="cat.label" class="category">
+          <div class="category-label">{{ cat.label }}</div>
+          <div class="category-grid">
+            <template v-if="cat.games.length > 0">
+              <button
+                v-for="g in cat.games"
+                :key="g"
+                class="game-card"
+                @click="selectGame(g)"
+              >
+                <span class="game-icon">{{ gameInfo[g]?.icon || '🎮' }}</span>
+                <span class="game-title">{{ gameInfo[g]?.title || g }}</span>
+                <span class="game-desc">{{ gameInfo[g]?.desc || '' }}</span>
+              </button>
+            </template>
+            <div v-else class="empty-slot">
+              <span class="empty-icon">🔒</span>
+              <span class="empty-text">More games coming...</span>
+            </div>
+          </div>
+        </div>
       </div>
     </template>
 
@@ -95,6 +143,9 @@ onMounted(async () => {
         <GameMergeFall v-else-if="currentGame === 'mergefall'" />
         <GameNutsBolts v-else-if="currentGame === 'nuts_bolts'" />
         <GameSokoban v-else-if="currentGame === 'sokoban'" />
+        <GameFourInARow v-else-if="currentGame === 'fourinarow'" />
+        <GameOthello v-else-if="currentGame === 'othello'" />
+        <GameTicTacToe v-else-if="currentGame === 'tictactoe'" />
       </main>
     </template>
   </div>
@@ -140,18 +191,34 @@ body {
   color: #64748b;
 }
 
-.game-grid {
+.categories {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 24px;
+}
+
+.category-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #475569;
+  margin-bottom: 10px;
+  padding-left: 2px;
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
 }
 
 .game-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 24px 20px;
+  gap: 5px;
+  padding: 18px 12px;
   background: #1e293b;
   border: 2px solid #334155;
   border-radius: 14px;
@@ -168,19 +235,41 @@ body {
 }
 
 .game-icon {
-  font-size: 2.2rem;
+  font-size: 1.8rem;
 }
 
 .game-title {
-  font-size: 1.3rem;
+  font-size: 1rem;
   font-weight: 700;
   color: #f1f5f9;
 }
 
 .game-desc {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: #94a3b8;
   line-height: 1.4;
+}
+
+.empty-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px 12px;
+  border: 2px dashed #1e293b;
+  border-radius: 14px;
+  grid-column: 1 / -1;
+}
+
+.empty-icon {
+  font-size: 1.6rem;
+  opacity: 0.4;
+}
+
+.empty-text {
+  font-size: 0.8rem;
+  color: #334155;
 }
 
 /* ── Game header ──────────────────────────────────── */

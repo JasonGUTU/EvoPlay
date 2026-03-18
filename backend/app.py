@@ -14,6 +14,9 @@ from games.game_2048 import Game2048
 from games.game_mergefall import MergeFall
 from games.game_nuts_bolts import NutsBolts
 from games.game_sokoban import Sokoban
+from games.game_fourinarow import FourInARow
+from games.game_othello import Othello
+from games.game_tictactoe import TicTacToe
 
 # ── Logging ─────────────────────────────────────────────────────────
 
@@ -35,6 +38,9 @@ GAMES: dict[str, type] = {
     "mergefall": MergeFall,
     "nuts_bolts": NutsBolts,
     "sokoban": Sokoban,
+    "fourinarow": FourInARow,
+    "othello": Othello,
+    "tictactoe": TicTacToe,
 }
 
 # Active game sessions keyed by (game_name, session_id) tuple.
@@ -151,9 +157,28 @@ def game_reset(name: str):
     game, session_id = _get_game(name)
     if game is None:
         return jsonify({"error": f"Unknown game: {name}"}), 404
+    difficulty = request.args.get("difficulty")
+    if difficulty and hasattr(game, "set_difficulty"):
+        game.set_difficulty(difficulty)
     state = game.reset()
     state["session_id"] = session_id  # Include session_id in response
     _log_action(f"{name}[{session_id[:8]}]", "RESET", state)
+    return jsonify(state)
+
+
+@app.get("/api/game/<name>/bot_move")
+def game_bot_move(name: str):
+    """Trigger the bot's move (used for two-phase turn rendering)."""
+    game, session_id = _get_game(name, require_session=True)
+    if session_id is None:
+        return jsonify({"error": "Missing required 'session_id' query parameter."}), 400
+    if game is None:
+        return jsonify({"error": f"Unknown game: {name}"}), 404
+    if not hasattr(game, "apply_bot_move"):
+        return jsonify({"error": f"Game '{name}' does not support separate bot moves."}), 400
+    state = game.apply_bot_move()
+    state["session_id"] = session_id
+    _log_action(f"{name}[{session_id[:8]}]", "BOT_MOVE", state)
     return jsonify(state)
 
 
