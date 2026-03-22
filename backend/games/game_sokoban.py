@@ -19,6 +19,7 @@ from .base import BaseGame
 # ' ' = Floor
 # '#' = Wall
 # 'O' = Obstacle (treat as Wall for movement)
+# 'W' = Water Obstacle (treat as Wall for movement)
 # '.' = Goal
 
 INITIAL_MAP = [
@@ -50,7 +51,7 @@ class Sokoban(BaseGame):
         self.history: dict[str, Any] | None = None
         
         self.current_level: int = 1
-        self.max_level: int = 2
+        self.max_level: int = 10
         
         self._reset_log()
         self.reset()
@@ -117,6 +118,166 @@ class Sokoban(BaseGame):
             self.map = deepcopy(INITIAL_MAP)
             self.player_pos = deepcopy(INITIAL_PLAYER_POS)
             self.boxes = deepcopy(INITIAL_BOXES)
+        elif level == 3:
+            # Level 3 map
+            self.map = [
+                ['#', '#', '#', '#', '#', '#', '#'],
+                ['#', '.', ' ', ' ', ' ', '.', '#'],
+                ['#', ' ', ' ', ' ', ' ', ' ', '#'],
+                ['#', ' ', ' ', ' ', ' ', ' ', '#'],
+                ['#', ' ', ' ', ' ', ' ', ' ', '#'],
+                ['#', '.', ' ', ' ', ' ', '.', '#'],
+                ['#', '#', '#', '#', '#', '#', '#']
+            ]
+            self.player_pos = [3, 3] # Center
+            self.boxes = [
+                [2, 3], # Top
+                [4, 3], # Bottom
+                [3, 2], # Left
+                [3, 4]  # Right
+            ]
+        elif level == 4:
+            self.map = [
+                ['#', '#', '#', '#', '#', '#', '#'],
+                ['#', '.', ' ', ' ', ' ', '.', '#'],
+                ['#', ' ', ' ', ' ', ' ', ' ', '#'],
+                ['#', '.', ' ', ' ', ' ', '.', '#'],
+                ['#', '#', '#', '#', '#', '#', '#']
+            ]
+            self.player_pos = [2, 3] # Center
+            self.boxes = [
+                [1, 3], # Top
+                [3, 3], # Bottom
+                [2, 2], # Left
+                [2, 4]  # Right
+            ]
+        elif level == 5:
+            self.map = [
+                ['#', '#', '#', '#', '#', '#', '#', '#', '#'],
+                ['#', '.', ' ', ' ', ' ', ' ', ' ', '.', '#'],
+                ['#', ' ', 'O', ' ', '.', ' ', 'W', ' ', '#'],
+                ['#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#'],
+                ['#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#'],
+                ['#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#'],
+                ['#', ' ', 'W', ' ', '.', ' ', 'O', ' ', '#'],
+                ['#', '.', ' ', ' ', ' ', ' ', ' ', '.', '#'],
+                ['#', '#', '#', '#', '#', '#', '#', '#', '#']
+            ]
+            self.player_pos = [4, 4] # Center
+            self.boxes = [
+                [2, 4], # Top outer
+                [3, 4], # Top inner
+                [5, 4], # Bottom inner
+                [6, 4], # Bottom outer
+                [4, 3], # Left
+                [4, 5]  # Right
+            ]
+        elif level == 6:
+            # Level 6 (Push6) map from image:
+            # Inner grid is 6 columns wide, 4 rows high -> Total 8x6 with walls
+            # 8 Boxes, 7 Visible Goals.
+            # The top row has ONLY ONE goal at col 6.
+            self.map = [
+                ['#', '#', '#', '#', '#', '#', '#', '#'],
+                ['#', ' ', ' ', ' ', ' ', ' ', '.', '#'],
+                ['#', ' ', '.', ' ', ' ', ' ', '.', '#'],
+                ['#', ' ', ' ', '.', ' ', ' ', '.', '#'],
+                ['#', ' ', '.', ' ', ' ', ' ', '.', '#'],
+                ['#', '#', '#', '#', '#', '#', '#', '#']
+            ]
+            self.player_pos = [2, 1] 
+            self.boxes = [
+                [1, 2],         [1, 5],
+                [2, 3],         [2, 5],
+                [3, 2],         [3, 5],
+                [4, 3],         [4, 5]
+            ]
+        elif level == 7:
+            # Level 7 (Push7) map from image:
+            # 7x7 grid, cross-shaped interior (fat cross)
+            # Player in center, surrounded by 8 boxes in a 3x3 area.
+            # 8 goals at the inner corners of the cross.
+            self.map = [
+                ['#', '#', '#', '#', '#', '#', '#'],
+                ['#', '#', '.', ' ', '.', '#', '#'],
+                ['#', '.', ' ', ' ', ' ', '.', '#'],
+                ['#', ' ', ' ', ' ', ' ', ' ', '#'],
+                ['#', '.', ' ', ' ', ' ', '.', '#'],
+                ['#', '#', '.', ' ', '.', '#', '#'],
+                ['#', '#', '#', '#', '#', '#', '#']
+            ]
+            self.player_pos = [3, 3] # Center
+            self.boxes = [
+                [2, 2], [2, 3], [2, 4],
+                [3, 2],         [3, 4],
+                [4, 2], [4, 3], [4, 4]
+            ]
+        elif level == 8:
+            # Level 8 (Push8) map from image:
+            # 5x5 inner grid -> 7x7 total with walls
+            self.map = [
+                ['#', '#', '#', '#', '#', '#', '#'],
+                ['#', '.', ' ', ' ', '.', '.', '#'],
+                ['#', '.', ' ', ' ', ' ', ' ', '#'],
+                ['#', ' ', ' ', 'W', ' ', ' ', '#'],
+                ['#', ' ', ' ', ' ', ' ', '.', '#'],
+                ['#', '.', '.', ' ', ' ', '.', '#'],
+                ['#', '#', '#', '#', '#', '#', '#']
+            ]
+            self.player_pos = [4, 2] # r=3, c=1 in inner grid -> r=4, c=2 in 7x7 grid
+            self.boxes = [
+                [1, 3], # r=0, c=2
+                [2, 3], # r=1, c=2
+                [3, 1], # r=2, c=0
+                [3, 2], # r=2, c=1
+                [3, 4], # r=2, c=3
+                [3, 5], # r=2, c=4
+                [4, 3], # r=3, c=2
+                [5, 3]  # r=4, c=2
+            ]
+        elif level == 9:
+            # Level 9 (Push9) map from image:
+            # Small 5x5-ish map with 2 boxes and 2 goals.
+            # Goals: (1, 2) (visible blue circle) and (2, 1) (inferred under Cyan Box).
+            # Boxes: (2, 1) (Cyan) and (3, 2) (Orange).
+            # Player: (2, 2).
+            # To be solvable, (4, 3) must be floor.
+            self.map = [
+                ['#', '#', '#', '#', '#'],
+                ['#', ' ', '.', '#', '#'],
+                ['#', '.', ' ', '#', '#'],
+                ['#', ' ', ' ', ' ', '#'],
+                ['#', ' ', ' ', ' ', '#'],
+                ['#', '#', '#', '#', '#']
+            ]
+            self.player_pos = [2, 2]
+            self.boxes = [
+                [2, 1], # Starts on goal (Cyan)
+                [3, 2]  # Orange
+            ]
+        elif level == 10:
+            # Level 10 (Push10) map from image:
+            # 9x9 grid (7x7 inner)
+            # Player center. 8 Boxes surrounding player.
+            # Goals: 4 corners + 4 inner side positions.
+            # Obstacles: Water (left), Rope (right).
+            self.map = [
+                ['#', '#', '#', '#', '#', '#', '#', '#', '#'],
+                ['#', '.', ' ', ' ', ' ', ' ', ' ', '.', '#'],
+                ['#', ' ', 'W', ' ', ' ', ' ', 'O', ' ', '#'],
+                ['#', ' ', '.', ' ', ' ', ' ', '.', ' ', '#'],
+                ['#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#'],
+                ['#', ' ', '.', ' ', ' ', ' ', '.', ' ', '#'],
+                ['#', ' ', 'W', ' ', ' ', ' ', 'O', ' ', '#'],
+                ['#', '.', ' ', ' ', ' ', ' ', ' ', '.', '#'],
+                ['#', '#', '#', '#', '#', '#', '#', '#', '#']
+            ]
+            self.player_pos = [4, 4]
+            self.boxes = [
+                [3, 3], [3, 4], [3, 5],
+                [4, 3],         [4, 5],
+                [5, 3], [5, 4], [5, 5]
+            ]
 
         self.score = 0
         self.game_over = False
@@ -216,6 +377,23 @@ AVAILABLE ACTIONS:
                 
         return True
 
+    def _update_score(self) -> None:
+        """Update score: 10 points for each box on a goal."""
+        goals = []
+        for r in range(len(self.map)):
+            for c in range(len(self.map[r])):
+                if self.map[r][c] == '.':
+                    goals.append([r, c])
+                    
+        goals_covered = 0
+        for goal in goals:
+            for box in self.boxes:
+                if box[0] == goal[0] and box[1] == goal[1]:
+                    goals_covered += 1
+                    break
+                    
+        self.score = goals_covered * 10
+
     def _move(self, direction: str) -> None:
         if not self._can_move(direction):
             return
@@ -233,8 +411,9 @@ AVAILABLE ACTIONS:
             box[1] = box[1] + dc
             
         self.player_pos = [nr, nc]
-        self.score += 1
         
+        # Update score after move
+        self._update_score()
         self._check_win_condition()
 
     def _check_win_condition(self) -> None:
@@ -245,14 +424,15 @@ AVAILABLE ACTIONS:
                 if self.map[r][c] == '.':
                     goals.append([r, c])
                     
-        # Check if every box coordinates exists in goals coordinates
-        boxes_on_goal = 0
-        for box in self.boxes:
-            for goal in goals:
+        # Check if every goal is covered by a box
+        goals_covered = 0
+        for goal in goals:
+            for box in self.boxes:
                 if box[0] == goal[0] and box[1] == goal[1]:
-                    boxes_on_goal += 1
+                    goals_covered += 1
                     break
                     
-        if boxes_on_goal == len(self.boxes) and len(self.boxes) == len(goals):
+        # Win if all goals are covered
+        if len(goals) > 0 and goals_covered == len(goals):
             self.won = True
             self.game_over = True

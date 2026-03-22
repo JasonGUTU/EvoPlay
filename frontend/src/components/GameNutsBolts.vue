@@ -147,8 +147,49 @@ const colorMap = {
   'r': '#ef4444', // red
   'y': '#f59e0b', // yellow
   'b': '#3b82f6', // blue
-  'g': '#22c55e'  // green
+  'g': '#22c55e', // green
+  'o': '#f97316', // orange
+  'p': '#ec4899', // pink
+  'c': '#06b6d4', // cyan
+  'v': '#7c3aed', // deep purple (violet-700)
+  'm': '#d946ef', // pinkish purple (fuchsia-500)
+  'n': '#a97142', // brown/bronze
+  's': '#94a3b8', // silver
+  't': '#0d9488', // teal (blueish green)
+  'k': '#15803d', // dark green (green-700)
+  'd': '#d4b996', // sand/beige
+  'l': '#84cc16'  // lime
 };
+
+const screwContainerStyle = computed(() => {
+  if (screwCapacity.value >= 8) {
+    return { height: '300px' };
+  }
+  if (screwCapacity.value >= 6) {
+    return { height: '240px' };
+  }
+  return {};
+});
+
+const screwPegStyle = computed(() => {
+  if (screwCapacity.value >= 8) {
+    return { height: '260px' };
+  }
+  if (screwCapacity.value >= 6) {
+    return { height: '200px' };
+  }
+  return {};
+});
+
+const nutsStackStyle = computed(() => {
+  if (screwCapacity.value >= 8) {
+    return { height: '260px' };
+  }
+  if (screwCapacity.value >= 6) {
+    return { height: '200px' };
+  }
+  return {};
+});
 
 function nutStyle(color, isTop, isSelectedScrew) {
   return {
@@ -202,7 +243,10 @@ function nutStyle(color, isTop, isSelectedScrew) {
 
     <!-- Game Board -->
     <div class="board-container">
-      <div class="screws-grid">
+      <div 
+        class="screws-grid" 
+        :style="{ maxWidth: currentLevel >= 10 ? '370px' : (currentLevel >= 9 ? '540px' : (currentLevel === 8 ? '540px' : (currentLevel >= 7 ? '440px' : (currentLevel === 6 ? '540px' : (currentLevel === 5 ? '440px' : (currentLevel === 4 ? '340px' : '280px')))))) }"
+      >
         <!-- Loop over each screw -->
         <div 
           v-for="(screw, idx) in board" 
@@ -212,16 +256,17 @@ function nutStyle(color, isTop, isSelectedScrew) {
             'is-selected': selectedScrew === idx,
             'is-valid-target': selectedScrew !== null && selectedScrew !== idx && validActions.includes('select_' + idx)
           }"
+          :style="screwContainerStyle"
           @click="handleScrewClick(idx)"
         >
           <!-- Base/Platform -->
           <div class="screw-base"></div>
           
           <!-- The visual screw peg -->
-          <div class="screw-peg"></div>
+          <div class="screw-peg" :style="screwPegStyle"></div>
           
           <!-- Nuts stacked from bottom to top -->
-          <div class="nuts-stack">
+          <div class="nuts-stack" :style="nutsStackStyle">
             <!-- Empty spacers if capacity is not met, so nuts always sit at bottom -->
             <div 
               v-for="emptySlot in (screwCapacity - screw.length)" 
@@ -399,7 +444,8 @@ button {
   justify-content: center;
   flex-wrap: wrap;
   gap: 20px;
-  max-width: 280px; /* Forces wrap after 3 items (70px width + 20px gap per item) */
+  /* Dynamically adjust max-width in JS or just allow wrapping */
+  /* max-width: 280px; -> moved to inline style */
   margin: 0 auto;
 }
 
