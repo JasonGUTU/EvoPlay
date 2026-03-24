@@ -147,6 +147,19 @@ class BaseGame(ABC):
             "log": list(self._log),
         }
 
+    def get_metrics(self) -> dict[str, Any]:
+        """
+        Return game-specific tracking metrics for analytics.
+        By default, it returns steps and final score.
+        Subclasses should override this to include game-specific data.
+        """
+        return {
+            "steps": self._steps,
+            "score": getattr(self, "score", 0),
+            "game_over": getattr(self, "game_over", False),
+            "won": getattr(self, "won", False)
+        }
+
     # ── Abstract interface ──────────────────────────────────────────
 
     @abstractmethod

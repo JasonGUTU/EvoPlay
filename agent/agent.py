@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import time
+import json
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +48,11 @@ class Agent:
         self.game_name = game_name
         self.session_id = session_id
         self.step_count = 0
+        # Setup agent reasoning logging
+        self.log_dir = Path("agent_logs")
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.agent_log_file = None
+        
         # Use model name as player_name if not explicitly provided
         self.player_name = player_name or getattr(getattr(reasoning, "llm", None), "model", "llm-agent")
         # LLM response log (created lazily after session_id is known)
@@ -231,7 +237,9 @@ class Agent:
 
         # Step 4: Use reasoning engine to decide on action
         action = self.reasoning.reason(state, valid_actions, rules)
-
+        # Log reasoning history
+        self._log_reasoning(state, valid_actions, action)
+        
         # Step 5: Log LLM response
         self._write_llm_log(self.step_count + 1)
 
@@ -244,6 +252,28 @@ class Agent:
 
         return new_state
     
+    def _log_reasoning(self, state: dict[str, Any], valid_actions: list[str], chosen_action: str) -> None:
+        """Log the state and chosen action for analysis."""
+        if not self.session_id:
+            return
+            
+        if self.agent_log_file is None:
+            # Initialize log file
+            log_path = self.log_dir / f"{self.game_name}_{self.session_id}.jsonl"
+            self.agent_log_file = open(log_path, "a", encoding="utf-8")
+            
+        log_entry = {
+            "step": self.step_count,
+            "game": self.game_name,
+            "session_id": self.session_id,
+            "state": state,
+            "valid_actions": valid_actions,
+            "chosen_action": chosen_action,
+            "timestamp": time.time()
+        }
+        self.agent_log_file.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+        self.agent_log_file.flush()
+
     def run_loop(self, max_steps: int | None = None, delay: float = 1.0):
         """
         Run the agent in a loop, continuously playing the game.

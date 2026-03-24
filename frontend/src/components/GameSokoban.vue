@@ -160,6 +160,7 @@ function getTileClass(r, c) {
   const char = mapGrid.value[r][c];
   if (char === "#") return "wall";
   if (char === "O") return "obstacle"; 
+  if (char === "W") return "water"; 
   if (char === ".") return "goal";
   return "floor";
 }
@@ -220,6 +221,7 @@ function isPlayer(r, c) {
             <span v-if="isPlayer(r, c)" class="entity player">👷</span>
             <span v-else-if="hasBox(r, c)" class="entity box">📦</span>
             <span v-else-if="col === 'O'" class="entity obstacle">🪢</span>
+            <span v-else-if="col === 'W'" class="entity water-obstacle">🪣</span>
             <span v-else-if="col === '.'" class="entity goal-marker">🔵</span>
           </div>
         </div>
@@ -428,7 +430,7 @@ button {
   box-shadow: inset 0 2px 0 rgba(255,255,255,0.2), inset 0 -2px 0 rgba(0,0,0,0.2);
 }
 
-.cell.floor, .cell.goal, .cell.obstacle {
+.cell.floor, .cell.goal, .cell.obstacle, .cell.water {
   background: #b0ada8; /* Concrete grey */
   border: 1px solid #9c9993;
 }
