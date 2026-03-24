@@ -16,6 +16,14 @@ const won = ref(false);
 const validActions = ref([]);
 const error = ref("");
 const lastAction = ref("");
+const difficulty = ref("medium");
+const maxTile = ref(0);
+
+const DIFFICULTIES = [
+  { value: "easy",   label: "Easy",   desc: "Only 2s spawn" },
+  { value: "medium", label: "Medium", desc: "90% 2s, 10% 4s" },
+  { value: "hard",   label: "Hard",   desc: "50% 2s, 50% 4s" },
+];
 
 // ── API helpers ────────────────────────────────────────────────────
 
@@ -53,13 +61,14 @@ async function sendAction(move) {
   logRef.value?.fetchLog();
 }
 
-async function resetGame() {
+async function resetGame(newDifficulty) {
+  if (newDifficulty) difficulty.value = newDifficulty;
   lastAction.value = "";
   error.value = "";
   // Reset session ID to get a fresh game instance
   const sid = resetSessionId("2048");
   sessionId.value = sid;
-  const url = addSessionToUrl(`${API}/reset`, sid);
+  const url = addSessionToUrl(`${API}/reset?difficulty=${difficulty.value}`, sid);
   const res = await fetch(url);
   const data = await res.json();
   if (data.session_id) {
@@ -75,6 +84,8 @@ function applyState(state) {
   gameOver.value = state.game_over;
   won.value = state.won;
   validActions.value = state.valid_actions || [];
+  if (state.difficulty) difficulty.value = state.difficulty;
+  if (state.max_tile !== undefined) maxTile.value = state.max_tile;
   
   // Stop polling if game is over
   if (state.game_over) {
@@ -179,13 +190,25 @@ function tileStyle(value) {
 
 <template>
   <div class="game-2048" tabindex="0">
+    <!-- Difficulty selector -->
+    <div class="difficulty-bar">
+      <button
+        v-for="d in DIFFICULTIES"
+        :key="d.value"
+        class="diff-btn"
+        :class="{ active: difficulty === d.value }"
+        :title="d.desc"
+        @click="resetGame(d.value)"
+      >{{ d.label }}</button>
+    </div>
+
     <!-- Score bar -->
     <div class="info-bar">
       <div class="score-box">
         <span class="label">Score</span>
         <span class="value">{{ score }}</span>
       </div>
-      <button class="reset-btn" @click="resetGame">New Game</button>
+      <button class="reset-btn" @click="resetGame()">New Game</button>
     </div>
 
     <!-- Status -->
@@ -250,6 +273,31 @@ function tileStyle(value) {
 <style scoped>
 .game-2048 {
   outline: none;
+}
+
+/* Difficulty */
+.difficulty-bar {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.diff-btn {
+  padding: 5px 16px;
+  border-radius: 20px;
+  border: 1px solid #bbada0;
+  background: transparent;
+  color: #bbada0;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.diff-btn:hover { border-color: #8f7a66; color: #8f7a66; }
+.diff-btn.active {
+  background: #8f7a66;
+  border-color: #8f7a66;
+  color: #f9f6f2;
+  font-weight: 600;
 }
 
 .info-bar {
