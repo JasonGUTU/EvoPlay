@@ -31,6 +31,16 @@ from .base import BaseGame
 DEFAULT_WIDTH = 5
 DEFAULT_HEIGHT = 6
 
+VALID_DIFFICULTIES = {"easy", "medium", "hard"}
+
+# Difficulty controls tile sampling spread (higher = more random/harder)
+# temp_base: base temperature for distribution, small_penalty: weight for tiles <=8
+DIFF_PARAMS = {
+    "easy":   {"temp_base": 1.0,  "temp_high": 0.85, "small_pen": 0.55, "high_pen": 0.12, "max_pen": 0.02},
+    "medium": {"temp_base": 1.5,  "temp_high": 1.2,  "small_pen": 0.70, "high_pen": 0.25, "max_pen": 0.08},
+    "hard":   {"temp_base": 2.5,  "temp_high": 2.0,  "small_pen": 0.90, "high_pen": 0.40, "max_pen": 0.15},
+}
+
 
 class MergeFall(BaseGame):
     """MergeFall – drop numbers, merge neighbors, chain combos."""
@@ -51,9 +61,14 @@ class MergeFall(BaseGame):
         self.score: int = 0
         self.game_over: bool = False
         self.next_tile: int = 2
+        self.difficulty: str = "easy"
         self._active_pos: Tuple[int, int] | None = None
         self._reset_log()
         self.reset()
+
+    def set_difficulty(self, difficulty: str) -> None:
+        if difficulty in VALID_DIFFICULTIES:
+            self.difficulty = difficulty
 
     # ── BaseGame interface ──────────────────────────────────────────
 
@@ -71,6 +86,7 @@ class MergeFall(BaseGame):
             "score": self.score,
             "next_tile": self.next_tile,
             "game_over": self.game_over,
+            "difficulty": self.difficulty,
             "valid_actions": self.valid_actions(),
         }
 
@@ -150,6 +166,13 @@ Note: Even if a column looks full, dropping into it might trigger merges that cl
         r = self._drop_active_into_column(col, self.next_tile)
         self._active_pos = (r, col)
 
+        # Capture pre-merge board (after drop, before merge) for animation
+        # Finalize active marker so it shows as a positive number
+        pre_merge = [
+            [abs(v) for v in self.board[row]]
+            for row in range(1, self.height)
+        ]
+
         # Resolve all merges and gravity
         gained = self._resolve_active_drop()
         self.score += gained
@@ -162,6 +185,8 @@ Note: Even if a column looks full, dropping into it might trigger merges that cl
             self.next_tile = self._sample_next_tile()
 
         state = self.get_state()
+        state["pre_merge_board"] = pre_merge
+        state["drop_pos"] = [r - 1, col] if r > 0 else [0, col]  # visible row index
         self._record_log(action, state)
         return state
 
@@ -286,12 +311,14 @@ Note: Even if a column looks full, dropping into it might trigger merges that cl
         if M < 2:
             return 2
 
+        dp = DIFF_PARAMS.get(self.difficulty, DIFF_PARAMS["easy"])
+
         max_exp = int(math.log2(M))
         candidates = [1 << e for e in range(1, max_exp + 1)]
 
         center_val = self._floor_pow2(max(4, M // 32))
         center_exp = int(math.log2(center_val))
-        temp = 0.85 if M >= 128 else 1.0
+        temp = dp["temp_high"] if M >= 128 else dp["temp_base"]
 
         weights: list[float] = []
         for v in candidates:
@@ -299,11 +326,11 @@ Note: Even if a column looks full, dropping into it might trigger merges that cl
             dist = abs(e - center_exp)
             w = math.exp(-dist / temp)
             if v <= 8:
-                w *= 0.55
+                w *= dp["small_pen"]
             if M >= 64 and v == M // 2:
-                w *= 0.12
+                w *= dp["high_pen"]
             if M >= 64 and v == M:
-                w *= 0.02
+                w *= dp["max_pen"]
             weights.append(w)
 
         s = sum(weights)

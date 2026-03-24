@@ -21,6 +21,13 @@ const lastGain = ref(0);
 const prevScore = ref(0);
 const gainKey = ref(0);
 const dropping = ref(false);
+const difficulty = ref("easy");
+
+const DIFFICULTIES = [
+  { value: "easy",   label: "Easy",   desc: "Tiles cluster together" },
+  { value: "medium", label: "Medium", desc: "More variety" },
+  { value: "hard",   label: "Hard",   desc: "Wild tile spawns" },
+];
 
 // Animation state: per-cell flags
 // cellAnim[r][c] = "drop" | "merge" | "pop" | ""
@@ -58,7 +65,7 @@ async function dropInColumn(col) {
   dropping.value = true;
   error.value = "";
   prevScore.value = score.value;
-  lastUserActionTime = Date.now(); // Record user action time
+  lastUserActionTime = Date.now();
 
   const oldBoard = board.value.map((row) => [...row]);
 
@@ -72,27 +79,36 @@ async function dropInColumn(col) {
   if (data.session_id) {
     sessionId.value = data.session_id;
   }
+
+  // Phase 1: show tile landing (pre-merge board)
+  if (data.pre_merge_board) {
+    applyState({ ...data, board: data.pre_merge_board }, true, oldBoard, col);
+    // Wait for drop animation to finish before showing merges
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  // Phase 2: show final merged board
+  const preMerge = data.pre_merge_board || oldBoard;
   const gain = data.score - prevScore.value;
   lastGain.value = gain;
   if (gain > 0) gainKey.value++;
-
-  applyState(data, true, oldBoard, col);
+  applyState(data, true, preMerge, -1);
   logRef.value?.fetchLog();
 
-  // Allow next action after animations settle
+  // Allow next action after merge animations settle
   setTimeout(() => {
     dropping.value = false;
-  }, 350);
+  }, 400);
 }
 
-async function resetGame() {
+async function resetGame(newDifficulty) {
+  if (newDifficulty) difficulty.value = newDifficulty;
   error.value = "";
   lastGain.value = 0;
   particles.splice(0);
-  // Reset session ID to get a fresh game instance
   const sid = resetSessionId("mergefall");
   sessionId.value = sid;
-  const url = addSessionToUrl(`${API}/reset`, sid);
+  const url = addSessionToUrl(`${API}/reset?difficulty=${difficulty.value}`, sid);
   const res = await fetch(url);
   const data = await res.json();
   if (data.session_id) {
@@ -110,6 +126,7 @@ function applyState(state, animate = false, oldBoard = null, dropCol = -1) {
   nextTile.value = state.next_tile;
   gameOver.value = state.game_over;
   validActions.value = state.valid_actions || [];
+  if (state.difficulty) difficulty.value = state.difficulty;
 
   initAnimGrid();
 
@@ -285,6 +302,18 @@ function particleStyle(p) {
 
 <template>
   <div class="mergefall" tabindex="0">
+    <!-- Difficulty selector -->
+    <div class="difficulty-bar">
+      <button
+        v-for="d in DIFFICULTIES"
+        :key="d.value"
+        class="diff-btn"
+        :class="{ active: difficulty === d.value }"
+        :title="d.desc"
+        @click="resetGame(d.value)"
+      >{{ d.label }}</button>
+    </div>
+
     <!-- Score bar -->
     <div class="info-bar">
       <div class="score-box">
@@ -360,6 +389,31 @@ function particleStyle(p) {
 <style scoped>
 .mergefall {
   outline: none;
+}
+
+/* Difficulty */
+.difficulty-bar {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.diff-btn {
+  padding: 5px 16px;
+  border-radius: 20px;
+  border: 1px solid #475569;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.diff-btn:hover { border-color: #94a3b8; color: #e2e8f0; }
+.diff-btn.active {
+  background: #475569;
+  border-color: #64748b;
+  color: #fff;
+  font-weight: 600;
 }
 
 /* ── Info bar ──────────────────────────────────────────────────── */

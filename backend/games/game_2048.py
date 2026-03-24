@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import json
 import random
 from copy import deepcopy
 from typing import Any, List, Tuple
@@ -9,6 +11,11 @@ from typing import Any, List, Tuple
 from .base import BaseGame
 
 GRID_SIZE = 4
+
+VALID_DIFFICULTIES = {"easy", "medium", "hard"}
+
+# Probability of spawning a "4" tile (vs "2") per difficulty
+FOUR_PROB = {"easy": 0.0, "medium": 0.1, "hard": 0.5}
 
 
 class Game2048(BaseGame):
@@ -21,8 +28,14 @@ class Game2048(BaseGame):
         self.score: int = 0
         self.game_over: bool = False
         self.won: bool = False
+        self.difficulty: str = "medium"
+        self.max_tile: int = 0
         self._reset_log()
         self.reset()
+
+    def set_difficulty(self, difficulty: str) -> None:
+        if difficulty in VALID_DIFFICULTIES:
+            self.difficulty = difficulty
 
     # ── BaseGame interface ──────────────────────────────────────────
 
@@ -33,6 +46,8 @@ class Game2048(BaseGame):
             "score": self.score,
             "game_over": self.game_over,
             "won": self.won,
+            "difficulty": self.difficulty,
+            "max_tile": self.max_tile,
             "valid_actions": self.valid_actions(),
         }
 
@@ -52,6 +67,7 @@ class Game2048(BaseGame):
         moved = self._move(action)
         if moved:
             self._spawn_tile()
+            self._update_max_tile()
             if not self._has_moves():
                 self.game_over = True
 
@@ -64,9 +80,11 @@ class Game2048(BaseGame):
         self.score = 0
         self.game_over = False
         self.won = False
+        self.max_tile = 0
         self._reset_log()
         self._spawn_tile()
         self._spawn_tile()
+        self._update_max_tile()
         return self.get_state()
 
     def valid_actions(self) -> list[str]:
@@ -108,6 +126,52 @@ The game ends when:
 
 When the game is over, you cannot make any more moves. Your final score is the sum of all merged tile values."""
 
+    # ── Log override (add max_tile column) ─────────────────────────
+
+    def _ensure_log_file(self) -> None:
+        if self._log_file is not None:
+            return
+        super()._ensure_log_file()
+        # Rewrite header with max_tile column
+        if self._log_file is not None:
+            self._log_file.seek(0)
+            self._log_file.truncate()
+            writer = csv.writer(self._log_file)
+            writer.writerow(["step", "time", "game", "player", "difficulty", "action", "score", "max_tile", "game_over", "board"])
+
+    def _record_log(self, action: str, state: dict[str, Any]) -> None:
+        import time as _time
+        now = _time.time()
+        if self._start_time is None:
+            self._start_time = now
+        self._steps += 1
+        entry = {
+            "step": self._steps,
+            "time": round(now - self._start_time, 2),
+            "action": action,
+            "score": state.get("score", 0),
+            "game_over": state.get("game_over", False),
+            "board": state.get("board"),
+        }
+        self._log.append(entry)
+        self._ensure_log_file()
+        if self._log_file is not None:
+            writer = csv.writer(self._log_file)
+            board_str = json.dumps(entry["board"], ensure_ascii=False) if entry["board"] else ""
+            writer.writerow([
+                entry["step"],
+                entry["time"],
+                self.name,
+                self._player_name or "",
+                self.difficulty,
+                entry["action"],
+                entry["score"],
+                self.max_tile,
+                entry["game_over"],
+                board_str,
+            ])
+            self._log_file.flush()
+
     # ── Internal helpers ────────────────────────────────────────────
 
     def _spawn_tile(self) -> None:
@@ -120,7 +184,15 @@ When the game is over, you cannot make any more moves. Your final score is the s
         if not empty:
             return
         r, c = random.choice(empty)
-        self.board[r][c] = 4 if random.random() < 0.1 else 2
+        prob = FOUR_PROB.get(self.difficulty, 0.1)
+        self.board[r][c] = 4 if random.random() < prob else 2
+
+    def _update_max_tile(self) -> None:
+        self.max_tile = max(
+            self.board[r][c]
+            for r in range(GRID_SIZE)
+            for c in range(GRID_SIZE)
+        )
 
     def _compress(self, row: list[int]) -> tuple[list[int], int, bool]:
         """Slide and merge a single row to the left. Return (new_row, gained_score, changed)."""
