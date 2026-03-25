@@ -95,7 +95,7 @@ class BaseGame(ABC):
         
         # Write CSV header
         writer = csv.writer(self._log_file)
-        writer.writerow(["step", "time", "game", "player", "difficulty", "action", "score", "game_over", "board"])
+        writer.writerow(["step", "timestamp", "time", "game", "player", "difficulty", "action", "score", "game_over", "board"])
 
     def _record_log(self, action: str, state: dict[str, Any]) -> None:
         """Append one log entry to memory and flush to disk."""
@@ -125,6 +125,7 @@ class BaseGame(ABC):
             difficulty = getattr(self, "difficulty", "")
             writer.writerow([
                 entry["step"],
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 entry["time"],
                 self.name,
                 self._player_name or "",

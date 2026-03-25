@@ -78,7 +78,7 @@ class MergeFall(BaseGame):
             [abs(v) for v in self.board[r]]
             for r in range(1, self.height)
         ]
-        return {
+        state = {
             "game": self.name,
             "board": deepcopy(visible_board),
             "width": self.width,
@@ -89,12 +89,18 @@ class MergeFall(BaseGame):
             "difficulty": self.difficulty,
             "valid_actions": self.valid_actions(),
         }
+        if self._pre_merge_board is not None:
+            state["pre_merge_board"] = self._pre_merge_board
+            state["drop_pos"] = self._drop_pos
+        return state
 
     def reset(self) -> dict[str, Any]:
         self.board = [[0] * self.width for _ in range(self.height)]
         self.score = 0
         self.game_over = False
         self._active_pos = None
+        self._pre_merge_board = None
+        self._drop_pos = None
         self._reset_log()
         self.next_tile = self._sample_next_tile()
         return self.get_state()
@@ -168,10 +174,11 @@ Note: Even if a column looks full, dropping into it might trigger merges that cl
 
         # Capture pre-merge board (after drop, before merge) for animation
         # Finalize active marker so it shows as a positive number
-        pre_merge = [
+        self._pre_merge_board = [
             [abs(v) for v in self.board[row]]
             for row in range(1, self.height)
         ]
+        self._drop_pos = [r - 1, col] if r > 0 else [0, col]  # visible row index
 
         # Resolve all merges and gravity
         gained = self._resolve_active_drop()
@@ -185,9 +192,10 @@ Note: Even if a column looks full, dropping into it might trigger merges that cl
             self.next_tile = self._sample_next_tile()
 
         state = self.get_state()
-        state["pre_merge_board"] = pre_merge
-        state["drop_pos"] = [r - 1, col] if r > 0 else [0, col]  # visible row index
         self._record_log(action, state)
+        # Clear pre_merge after it's been read once via get_state
+        self._pre_merge_board = None
+        self._drop_pos = None
         return state
 
     # ── Action parsing ──────────────────────────────────────────────

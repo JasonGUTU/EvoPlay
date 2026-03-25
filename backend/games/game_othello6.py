@@ -161,6 +161,9 @@ class Othello6(BaseGame):
 
     def get_state(self) -> dict[str, Any]:
         human_moves = _valid_moves(self.board, HUMAN)
+        hc = _count(self.board, HUMAN)
+        bc = _count(self.board, BOT)
+        self.score = f"{hc}:{bc}"
         return {
             "game": self.name,
             "board": [row[:] for row in self.board],
@@ -169,8 +172,8 @@ class Othello6(BaseGame):
             "won": self.won,
             "winner": self.winner,
             "difficulty": self.difficulty,
-            "human_count": _count(self.board, HUMAN),
-            "bot_count": _count(self.board, BOT),
+            "human_count": hc,
+            "bot_count": bc,
             "valid_moves": [[r, c] for r, c in human_moves],
             "valid_actions": self.valid_actions(),
         }

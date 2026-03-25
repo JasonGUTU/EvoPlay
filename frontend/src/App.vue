@@ -5,8 +5,8 @@ import GameMergeFall from "./components/GameMergeFall.vue";
 import GameNutsBolts from "./components/GameNutsBolts.vue";
 import GameSokoban from "./components/GameSokoban.vue";
 import GameFourInARow from "./components/GameFourInARow.vue";
-import GameOthello from "./components/GameOthello.vue";
 import GameOthello6 from "./components/GameOthello6.vue";
+import GameSlidingPuzzle from "./components/GameSlidingPuzzle.vue";
 import GameTicTacToe from "./components/GameTicTacToe.vue";
 
 const games = ref([]);
@@ -83,11 +83,6 @@ const gameInfo = {
     desc: "Drop pieces, get 4 in a line — beat the bot!",
     icon: "🔴",
   },
-  othello: {
-    title: "Othello",
-    desc: "Flip your opponent's pieces — control the board!",
-    icon: "⚫",
-  },
   othello6: {
     title: "Othello 6×6",
     desc: "Mini Othello — faster games on a smaller board!",
@@ -97,6 +92,11 @@ const gameInfo = {
     title: "Tic Tac Toe",
     desc: "Get 3 in a row — can you beat the perfect bot?",
     icon: "❌",
+  },
+  sliding_puzzle: {
+    title: "Sliding Puzzle",
+    desc: "Slide tiles to arrange numbers 1-8 in order!",
+    icon: "🧩",
   },
 };
 
@@ -111,11 +111,11 @@ const categories = [
   },
   {
     label: "1v1 vs Bot",
-    games: ["fourinarow", "othello", "othello6", "tictactoe"],
+    games: ["fourinarow", "othello6", "tictactoe"],
   },
   {
-    label: "Coming Soon",
-    games: [],
+    label: "Not Sure",
+    games: ["sliding_puzzle"],
   },
 ];
 
@@ -262,9 +262,9 @@ onMounted(async () => {
         <GameNutsBolts v-else-if="currentGame === 'nuts_bolts'" :player-name="playerName" />
         <GameSokoban v-else-if="currentGame === 'sokoban'" :player-name="playerName" />
         <GameFourInARow v-else-if="currentGame === 'fourinarow'" :player-name="playerName" />
-        <GameOthello v-else-if="currentGame === 'othello'" :player-name="playerName" />
         <GameOthello6 v-else-if="currentGame === 'othello6'" :player-name="playerName" />
         <GameTicTacToe v-else-if="currentGame === 'tictactoe'" :player-name="playerName" />
+        <GameSlidingPuzzle v-else-if="currentGame === 'sliding_puzzle'" :player-name="playerName" />
       </main>
     </template>
   </div>

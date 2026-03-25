@@ -71,10 +71,11 @@ class FourInARow(BaseGame):
             self.game_over = True
             self.won = True
             self.winner = "human"
-            self.score = 1
+            self.score = "human_win"
         elif self._is_draw():
             self.game_over = True
             self.winner = "draw"
+            self.score = "draw"
 
         state = self.get_state()
         self._record_log(f"human:{col}", state)
@@ -90,10 +91,11 @@ class FourInARow(BaseGame):
         if self._check_win(BOT):
             self.game_over = True
             self.winner = "bot"
-            self.score = -1
+            self.score = "bot_win"
         elif self._is_draw():
             self.game_over = True
             self.winner = "draw"
+            self.score = "draw"
 
         state = self.get_state()
         self._record_log(f"bot:{bot_col}", state)

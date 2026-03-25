@@ -202,12 +202,13 @@ Respond with ONLY "row col" (e.g., "1 1")."""
                 piece = cells[0]
                 self.winner = "human" if piece == HUMAN else "bot"
                 self.won = (piece == HUMAN)
-                self.score = 1 if self.won else -1
+                self.score = "human_win" if self.won else "bot_win"
                 self.winning_line = [[r, c] for r, c in line]
                 return True
         if _is_full(self.board):
             self.game_over = True
             self.winner = "draw"
+            self.score = "draw"
             return True
         return False
 
