@@ -44,7 +44,7 @@ function initAnimGrid() {
 
 // ── API helpers ────────────────────────────────────────────────────
 
-async function fetchState() {
+async function fetchState(isPolling = false) {
   // Check if session_id is provided in URL, if so, use it
   const urlSessionId = setSessionIdFromUrl("mergefall");
   const sid = urlSessionId || getSessionId("mergefall");
@@ -55,8 +55,20 @@ async function fetchState() {
   if (data.session_id) {
     sessionId.value = data.session_id;
   }
-  applyState(data, false);
-  // Also update log when fetching state (for polling to detect Agent actions)
+
+  // During polling: if pre_merge_board exists, do two-phase animation
+  if (isPolling && data.pre_merge_board) {
+    const oldBoard = board.value.map(row => [...row]);
+    const dropCol = data.drop_pos ? data.drop_pos[1] : -1;
+    // Phase 1: show tile landing
+    applyState({ ...data, board: data.pre_merge_board }, true, oldBoard, dropCol);
+    await new Promise(r => setTimeout(r, 400));
+    // Phase 2: show merged result
+    const preMerge = data.pre_merge_board;
+    applyState(data, true, preMerge, -1);
+  } else {
+    applyState(data, false);
+  }
   logRef.value?.fetchLog();
 }
 
@@ -221,7 +233,7 @@ function startPolling() {
       }
       
       if (!gameOver.value) {
-        await fetchState();
+        await fetchState(true);
       } else {
         stopPolling();
       }
@@ -389,6 +401,7 @@ function particleStyle(p) {
 <style scoped>
 .mergefall {
   outline: none;
+  position: relative;
 }
 
 /* Difficulty */
@@ -489,7 +502,10 @@ function particleStyle(p) {
   font-size: 1.1rem;
   font-weight: 700;
   color: #4ade80;
-  margin-bottom: 6px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
   animation: fadeUp 1s ease-out forwards;
 }
 

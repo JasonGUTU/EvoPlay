@@ -91,11 +91,27 @@ function applyState(state) {
 
 // ── Interaction Logic ──────────────────────────────────────────────
 
+const localSelected = ref(null);
+
 function handleScrewClick(index) {
   if (gameOver.value) return;
-  const action = `select_${index}`;
-  if (validActions.value.includes(action)) {
-    sendAction(action);
+
+  if (localSelected.value === null) {
+    // First click: select source screw (only if it has moves as source)
+    const hasMove = validActions.value.some(a => a.startsWith(`move_${index}_`));
+    if (hasMove) {
+      localSelected.value = index;
+    }
+  } else if (localSelected.value === index) {
+    // Click same screw: deselect
+    localSelected.value = null;
+  } else {
+    // Second click: try move from localSelected to index
+    const action = `move_${localSelected.value}_${index}`;
+    if (validActions.value.includes(action)) {
+      sendAction(action);
+    }
+    localSelected.value = null;
   }
 }
 
@@ -254,9 +270,9 @@ function nutStyle(color, isTop, isSelectedScrew) {
           v-for="(screw, idx) in board" 
           :key="idx" 
           class="screw-container"
-          :class="{ 
-            'is-selected': selectedScrew === idx,
-            'is-valid-target': selectedScrew !== null && selectedScrew !== idx && validActions.includes('select_' + idx)
+          :class="{
+            'is-selected': localSelected === idx,
+            'is-valid-target': localSelected !== null && localSelected !== idx && validActions.includes(`move_${localSelected}_${idx}`)
           }"
           :style="screwContainerStyle"
           @click="handleScrewClick(idx)"
@@ -283,7 +299,7 @@ function nutStyle(color, isTop, isSelectedScrew) {
                 v-for="(color, nutIdx) in screw" 
                 :key="'nut-'+idx+'-'+nutIdx" 
                 class="nut"
-                :style="nutStyle(color, nutIdx === screw.length - 1, selectedScrew === idx)"
+                :style="nutStyle(color, nutIdx === screw.length - 1, localSelected === idx)"
               >
                 <!-- Optional: add visual ridges to nuts -->
                 <div class="nut-ridge"></div>

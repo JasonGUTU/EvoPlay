@@ -108,7 +108,7 @@ GAMEPLAY:
 - On each turn, you slide all tiles in one of four directions: up, down, left, or right.
 - When you slide, all tiles move as far as possible in that direction until they hit the edge or another tile.
 - If two tiles with the same number collide while moving, they merge into a single tile with double the value.
-- After each move, a new tile (either 2 with 90% probability or 4 with 10% probability) appears in a random empty cell.
+- After each move, a new tile (either 2 or 4) appears in a random empty cell.
 
 AVAILABLE ACTIONS:
 You can choose one of four directions:
@@ -137,7 +137,7 @@ When the game is over, you cannot make any more moves. Your final score is the s
             self._log_file.seek(0)
             self._log_file.truncate()
             writer = csv.writer(self._log_file)
-            writer.writerow(["step", "time", "game", "player", "difficulty", "action", "score", "max_tile", "game_over", "board"])
+            writer.writerow(["step", "timestamp", "time", "game", "player", "difficulty", "action", "score", "max_tile", "game_over", "board"])
 
     def _record_log(self, action: str, state: dict[str, Any]) -> None:
         import time as _time
@@ -158,8 +158,10 @@ When the game is over, you cannot make any more moves. Your final score is the s
         if self._log_file is not None:
             writer = csv.writer(self._log_file)
             board_str = json.dumps(entry["board"], ensure_ascii=False) if entry["board"] else ""
+            from datetime import datetime as _dt
             writer.writerow([
                 entry["step"],
+                _dt.now().strftime("%Y-%m-%d %H:%M:%S"),
                 entry["time"],
                 self.name,
                 self._player_name or "",

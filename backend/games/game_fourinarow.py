@@ -71,10 +71,11 @@ class FourInARow(BaseGame):
             self.game_over = True
             self.won = True
             self.winner = "human"
-            self.score = 1
+            self.score = "human_win"
         elif self._is_draw():
             self.game_over = True
             self.winner = "draw"
+            self.score = "draw"
 
         state = self.get_state()
         self._record_log(f"human:{col}", state)
@@ -90,10 +91,11 @@ class FourInARow(BaseGame):
         if self._check_win(BOT):
             self.game_over = True
             self.winner = "bot"
-            self.score = -1
+            self.score = "bot_win"
         elif self._is_draw():
             self.game_over = True
             self.winner = "draw"
+            self.score = "draw"
 
         state = self.get_state()
         self._record_log(f"bot:{bot_col}", state)
@@ -135,11 +137,6 @@ AVAILABLE ACTIONS:
 - You will be given a list of valid columns. You MUST pick exactly one from that list — do NOT invent your own.
 - Choose a column number from 0 to 6 (e.g., "3" to drop in the center column).
 - A column is only valid if it is not completely filled (row 0 is not occupied).
-
-STRATEGY TIPS:
-- Control the center column (column 3) for more connection opportunities.
-- Look for opportunities to create two-way threats (two ways to win).
-- Block the opponent when they have 3 in a row with an open end.
 
 GAME OVER CONDITIONS:
 - You win if you connect 4 of your pieces in any direction.

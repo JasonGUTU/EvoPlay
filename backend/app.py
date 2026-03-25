@@ -34,9 +34,9 @@ from games.game_mergefall import MergeFall
 from games.game_nuts_bolts import NutsBolts
 from games.game_sokoban import Sokoban
 from games.game_fourinarow import FourInARow
-from games.game_othello import Othello
 from games.game_othello6 import Othello6
 from games.game_tictactoe import TicTacToe
+from games.game_sliding_puzzle import SlidingPuzzle
 
 # ── Logging ─────────────────────────────────────────────────────────
 
@@ -59,9 +59,9 @@ GAMES: dict[str, type] = {
     "nuts_bolts": NutsBolts,
     "sokoban": Sokoban,
     "fourinarow": FourInARow,
-    "othello": Othello,
     "othello6": Othello6,
     "tictactoe": TicTacToe,
+    "sliding_puzzle": SlidingPuzzle,
 }
 
 # Active game sessions keyed by (game_name, session_id) tuple.

@@ -185,11 +185,6 @@ AVAILABLE ACTIONS:
 - Action format: "row col" (e.g., "1 1" for the center cell).
 - You can only place on empty cells (value 0).
 
-STRATEGY TIPS:
-- The center (1 1) is the strongest opening move.
-- Corners (0 0, 0 2, 2 0, 2 2) are the second best positions.
-- Try to create a "fork" — two ways to win simultaneously — so the opponent can only block one.
-
 GAME OVER CONDITIONS:
 - You win by getting 3 of your marks in a row (any direction).
 - Bot wins by getting 3 of its marks in a row.
@@ -207,12 +202,13 @@ Respond with ONLY "row col" (e.g., "1 1")."""
                 piece = cells[0]
                 self.winner = "human" if piece == HUMAN else "bot"
                 self.won = (piece == HUMAN)
-                self.score = 1 if self.won else -1
+                self.score = "human_win" if self.won else "bot_win"
                 self.winning_line = [[r, c] for r, c in line]
                 return True
         if _is_full(self.board):
             self.game_over = True
             self.winner = "draw"
+            self.score = "draw"
             return True
         return False
 
