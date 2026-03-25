@@ -13,12 +13,14 @@ const board = ref([]);
 const score = ref(0);
 const gameOver = ref(false);
 const won = ref(false);
+const withdrawn = ref(false);
 const validActions = ref([]);
 const undosRemaining = ref(0);
 const selectedScrew = ref(null);
 const currentLevel = ref(1);
 const maxLevel = ref(1);
 const screwCapacity = ref(3);
+const difficulty = ref("easy");
 const error = ref("");
 const lastAction = ref("");
 
@@ -55,12 +57,13 @@ async function sendAction(actionStr) {
   logRef.value?.fetchLog();
 }
 
-async function resetGame() {
+async function resetGame(newDifficulty) {
+  if (newDifficulty) difficulty.value = newDifficulty;
   lastAction.value = "";
   error.value = "";
   // Use current session ID to reset current level instead of creating a new session (which would drop to level 1)
   const sid = sessionId.value || getSessionId("nuts_bolts");
-  const url = addSessionToUrl(`${API}/reset`, sid);
+  const url = addSessionToUrl(`${API}/reset?difficulty=${difficulty.value}`, sid);
   const res = await fetch(url);
   const data = await res.json();
   if (data.session_id) {
@@ -75,12 +78,14 @@ function applyState(state) {
   score.value = state.score;
   gameOver.value = state.game_over;
   won.value = state.won;
+  withdrawn.value = state.withdrawn || false;
   validActions.value = state.valid_actions || [];
   undosRemaining.value = state.undos_remaining || 0;
   selectedScrew.value = state.selected_screw;
   currentLevel.value = state.current_level || 1;
   maxLevel.value = state.max_level || 1;
   screwCapacity.value = state.screw_capacity || 3;
+  if (state.difficulty) difficulty.value = state.difficulty;
   
   if (state.game_over) {
     stopPolling();
@@ -221,10 +226,23 @@ function nutStyle(color, isTop, isSelectedScrew) {
 </script>
 
 <template>
-  <div class="game-nuts-bolts">
+  <div class="game-nuts-bolts game-container">
     
     <div class="level-indicator">
       <h3>Level {{ currentLevel }}</h3>
+    </div>
+
+    <!-- Difficulty -->
+    <div class="difficulty-bar" style="display: flex; justify-content: center; gap: 8px; margin-bottom: 16px;">
+      <button 
+        v-for="d in [{label:'Easy', value:'easy'}, {label:'Medium', value:'medium'}, {label:'Hard', value:'hard'}]"
+        :key="d.value"
+        :class="{ active: difficulty === d.value }"
+        :style="difficulty === d.value ? 'background: #3b82f6; color: white;' : 'background: #334155; color: white;'"
+        @click="resetGame(d.value)"
+      >
+        {{ d.label }}
+      </button>
     </div>
 
     <!-- Info bar -->
@@ -242,6 +260,13 @@ function nutStyle(color, isTop, isSelectedScrew) {
         >
           Next Level
         </button>
+        <button
+          v-else-if="withdrawn && currentLevel < maxLevel"
+          class="next-level-btn"
+          @click="sendAction('next_level')"
+        >
+          Next Level
+        </button>
         <button 
           class="undo-btn" 
           :disabled="!canUndo" 
@@ -250,13 +275,17 @@ function nutStyle(color, isTop, isSelectedScrew) {
         >
           Undo ({{ undosRemaining }})
         </button>
+        <button class="withdraw-btn" :disabled="gameOver" @click="sendAction('withdraw')">
+          Withdraw
+        </button>
         <button class="reset-btn" @click="resetGame">Restart</button>
       </div>
     </div>
 
     <!-- Status Messages -->
     <div v-if="won" class="banner won">You Won!</div>
-    <div v-if="gameOver && !won" class="banner over">Game Over</div>
+    <div v-else-if="withdrawn" class="banner withdraw">Withdrawn</div>
+    <div v-else-if="gameOver" class="banner over">Game Over</div>
     <div v-if="error" class="banner error">{{ error }}</div>
 
     <!-- Game Board -->
@@ -322,6 +351,20 @@ function nutStyle(color, isTop, isSelectedScrew) {
 </template>
 
 <style scoped>
+.game-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  background: #1e1e1e;
+  border-radius: 12px;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+/* Difficulty */
+.difficulty-bar button { padding: 6px 12px; border: 1px solid #555; border-radius: 4px; cursor: pointer; transition: all 0.2s ease; }
+.difficulty-bar button:hover:not(.active) { background: #444 !important; }
+
 .info-bar {
   display: flex;
   justify-content: space-between;
@@ -409,6 +452,20 @@ button {
   cursor: not-allowed;
 }
 
+.withdraw-btn {
+  background: #f59e0b;
+  color: white;
+}
+
+.withdraw-btn:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.withdraw-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .reset-btn {
   background: #ef4444;
   color: white;
@@ -441,6 +498,11 @@ button {
 
 .banner.over {
   background: #f59e0b;
+  color: white;
+}
+
+.banner.withdraw {
+  background: #f97316;
   color: white;
 }
 

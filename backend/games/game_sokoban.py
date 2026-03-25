@@ -35,6 +35,8 @@ INITIAL_PLAYER_POS = [1, 1]
 INITIAL_BOXES = [[2, 3], [3, 2]]
 MAX_UNDOS = 1
 
+VALID_DIFFICULTIES = {"easy", "medium", "hard"}
+
 class Sokoban(BaseGame):
     """Classic Sokoban box-pushing game."""
 
@@ -47,14 +49,28 @@ class Sokoban(BaseGame):
         self.score: int = 0
         self.game_over: bool = False
         self.won: bool = False
+        self.withdrawn: bool = False
         self.undo_available: bool = True
         self.history: dict[str, Any] | None = None
         
         self.current_level: int = 1
         self.max_level: int = 10
+        self.difficulty: str = "easy"
         
         self._reset_log()
         self.reset()
+
+    def set_difficulty(self, difficulty: str) -> None:
+        if difficulty in VALID_DIFFICULTIES:
+            self.difficulty = difficulty
+            # Map difficulty to starting level
+            if difficulty == "easy":
+                self.current_level = 1
+            elif difficulty == "medium":
+                self.current_level = 5
+            elif difficulty == "hard":
+                self.current_level = 8
+            self.reset()
 
     # ── BaseGame interface ──────────────────────────────────────────
 
@@ -69,10 +85,12 @@ class Sokoban(BaseGame):
             "score": self.score,
             "game_over": self.game_over,
             "won": self.won,
+            "withdrawn": self.withdrawn,
             "valid_actions": self.valid_actions(),
             "undo_available": self.undo_available,
             "current_level": self.current_level,
-            "max_level": self.max_level
+            "max_level": self.max_level,
+            "difficulty": self.difficulty
         }
 
     def apply_action(self, action: str) -> dict[str, Any]:
@@ -83,13 +101,16 @@ class Sokoban(BaseGame):
             state["error"] = "Game is already over."
             return state
 
-        if action not in self.valid_actions():
+        if action != "withdraw" and action not in self.valid_actions():
             state = self.get_state()
             state["error"] = f"Invalid action: {action}"
             return state
 
         if action == "undo":
             self._apply_undo()
+        elif action == "withdraw":
+            self.withdrawn = True
+            self.game_over = True
         elif action == "next_level":
             self.current_level += 1
             self._load_level(self.current_level)
@@ -282,12 +303,13 @@ class Sokoban(BaseGame):
         self.score = 0
         self.game_over = False
         self.won = False
+        self.withdrawn = False
         self.undo_available = True
         self.history = None
 
     def valid_actions(self) -> list[str]:
         if self.game_over:
-            if self.won and self.current_level < self.max_level:
+            if (self.won or self.withdrawn) and self.current_level < self.max_level:
                 return ["next_level"]
             return []
             
