@@ -182,6 +182,15 @@ class Othello(BaseGame):
         if self.game_over:
             return self.get_state()
 
+        # Human has no valid moves — pass turn to bot
+        if action.strip().lower() == "pass":
+            if not _valid_moves(self.board, HUMAN) and _valid_moves(self.board, BOT):
+                self._record_log("human:pass", self.get_state())
+                state = self.get_state()
+                state["bot_pending"] = True
+                return state
+            return {**self.get_state(), "error": "Cannot pass when you have valid moves."}
+
         try:
             parts = action.strip().split()
             r, c = int(parts[0]), int(parts[1])
@@ -194,7 +203,6 @@ class Othello(BaseGame):
         self.board = _apply_move(self.board, r, c, HUMAN)
         self._record_log(f"human:{r},{c}", self.get_state())
         self._resolve_game_over()
-        # Signal frontend that bot still needs to move
         state = self.get_state()
         state["bot_pending"] = not self.game_over
         return state
@@ -235,7 +243,13 @@ class Othello(BaseGame):
     def valid_actions(self) -> list[str]:
         if self.game_over:
             return []
-        return [f"{r} {c}" for r, c in _valid_moves(self.board, HUMAN)]
+        moves = _valid_moves(self.board, HUMAN)
+        if moves:
+            return [f"{r} {c}" for r, c in moves]
+        # Human has no moves but bot does — must pass
+        if _valid_moves(self.board, BOT):
+            return ["pass"]
+        return []
 
     def get_rules(self) -> str:
         return """Othello (Reversi) Game Rules

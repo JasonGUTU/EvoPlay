@@ -185,11 +185,6 @@ AVAILABLE ACTIONS:
 - Action format: "row col" (e.g., "1 1" for the center cell).
 - You can only place on empty cells (value 0).
 
-STRATEGY TIPS:
-- The center (1 1) is the strongest opening move.
-- Corners (0 0, 0 2, 2 0, 2 2) are the second best positions.
-- Try to create a "fork" — two ways to win simultaneously — so the opponent can only block one.
-
 GAME OVER CONDITIONS:
 - You win by getting 3 of your marks in a row (any direction).
 - Bot wins by getting 3 of its marks in a row.

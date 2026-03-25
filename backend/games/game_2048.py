@@ -108,7 +108,7 @@ GAMEPLAY:
 - On each turn, you slide all tiles in one of four directions: up, down, left, or right.
 - When you slide, all tiles move as far as possible in that direction until they hit the edge or another tile.
 - If two tiles with the same number collide while moving, they merge into a single tile with double the value.
-- After each move, a new tile (either 2 with 90% probability or 4 with 10% probability) appears in a random empty cell.
+- After each move, a new tile (either 2 or 4) appears in a random empty cell.
 
 AVAILABLE ACTIONS:
 You can choose one of four directions:

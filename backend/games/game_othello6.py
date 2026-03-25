@@ -180,6 +180,15 @@ class Othello6(BaseGame):
         if self.game_over:
             return self.get_state()
 
+        # Human has no valid moves — pass turn to bot
+        if action.strip().lower() == "pass":
+            if not _valid_moves(self.board, HUMAN) and _valid_moves(self.board, BOT):
+                self._record_log("human:pass", self.get_state())
+                state = self.get_state()
+                state["bot_pending"] = True
+                return state
+            return {**self.get_state(), "error": "Cannot pass when you have valid moves."}
+
         try:
             parts = action.strip().split()
             r, c = int(parts[0]), int(parts[1])
@@ -232,7 +241,13 @@ class Othello6(BaseGame):
     def valid_actions(self) -> list[str]:
         if self.game_over:
             return []
-        return [f"{r} {c}" for r, c in _valid_moves(self.board, HUMAN)]
+        moves = _valid_moves(self.board, HUMAN)
+        if moves:
+            return [f"{r} {c}" for r, c in moves]
+        # Human has no moves but bot does — must pass
+        if _valid_moves(self.board, BOT):
+            return ["pass"]
+        return []
 
     def get_rules(self) -> str:
         return """Othello 6×6 (Mini Reversi) Game Rules
@@ -256,11 +271,6 @@ AVAILABLE ACTIONS:
 - You will be given a list of valid moves. You MUST pick exactly one from that list — do NOT invent your own position.
 - Action format: "row col" (0-indexed). For example, "1 3" means row 1, column 3.
 - Only positions that flip at least one opponent piece are valid moves.
-
-STRATEGY TIPS:
-- Corners (0 0, 0 5, 5 0, 5 5) are extremely valuable — they can never be flipped once taken.
-- Avoid placing pieces on squares adjacent to empty corners (especially diagonal neighbors).
-- Mobility matters: keep more moves available for yourself while restricting your opponent.
 
 GAME OVER CONDITIONS:
 - The game ends when neither player has a valid move (usually when the board is full).

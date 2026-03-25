@@ -82,13 +82,19 @@ class VanillaReasoning(Reasoning):
         if rules:
             rules_section = f"\n\nGAME RULES:\n{rules}\n"
         
+        # Build game-specific extra context
+        extra_context = ""
+        if game_name == "mergefall":
+            next_tile = game_state.get("next_tile", "?")
+            extra_context = f"\nNext tile to drop: {next_tile}\n"
+
         actions_str = ', '.join(valid_actions)
         prompt = f"""You are playing the game "{game_name}".{rules_section}
 
 Current board:
 {self._format_board(board)}
 Score: {score}
-
+{extra_context}
 IMPORTANT: You MUST choose exactly one action from this list (copy it exactly):
 [{actions_str}]
 

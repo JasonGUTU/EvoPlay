@@ -136,11 +136,6 @@ AVAILABLE ACTIONS:
 - Choose a column number from 0 to 6 (e.g., "3" to drop in the center column).
 - A column is only valid if it is not completely filled (row 0 is not occupied).
 
-STRATEGY TIPS:
-- Control the center column (column 3) for more connection opportunities.
-- Look for opportunities to create two-way threats (two ways to win).
-- Block the opponent when they have 3 in a row with an open end.
-
 GAME OVER CONDITIONS:
 - You win if you connect 4 of your pieces in any direction.
 - Bot wins if it connects 4 of its pieces.
