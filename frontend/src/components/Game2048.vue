@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, computed, nextTick } from "vue";
 import GameLog from "./GameLog.vue";
 import { getSessionId, resetSessionId, addSessionToUrl, setSessionIdFromUrl } from "../utils/session.js";
 
@@ -17,8 +17,13 @@ const validActions = ref([]);
 const error = ref("");
 const agentError = ref("");
 const lastAction = ref("");
-const difficulty = ref("medium");
+const difficulty = ref("hard");
 const maxTile = ref(0);
+
+// Tile animation state
+let tileIdCounter = 0;
+const tiles = ref([]); // {id, value, row, col, merged, isNew}
+const isAnimating = ref(false);
 
 const DIFFICULTIES = [
   { value: "easy",   label: "Easy",   desc: "Only 2s spawn" },
@@ -26,10 +31,120 @@ const DIFFICULTIES = [
   { value: "hard",   label: "Hard",   desc: "50% 2s, 50% 4s" },
 ];
 
+// ── Tile management ──────────────────────────────────────────────
+
+function boardToTiles(b) {
+  const result = [];
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      if (b[r][c] !== 0) {
+        result.push({ id: ++tileIdCounter, value: b[r][c], row: r, col: c, merged: false, isNew: false });
+      }
+    }
+  }
+  return result;
+}
+
+function simulateMove(oldBoard, direction) {
+  // Returns { newBoard, movements: [{fromR, fromC, toR, toC, value, merged, mergedValue}], changed }
+  const b = oldBoard.map(row => [...row]);
+  const movements = [];
+  let changed = false;
+
+  function processLine(line, indices) {
+    // line: array of {value, origIdx}
+    // Returns processed line with merge info
+    const nonZero = line.filter(x => x.value !== 0);
+    const result = [];
+    let i = 0;
+    while (i < nonZero.length) {
+      if (i + 1 < nonZero.length && nonZero[i].value === nonZero[i + 1].value) {
+        // Merge
+        result.push({ value: nonZero[i].value * 2, sources: [nonZero[i], nonZero[i + 1]], merged: true });
+        i += 2;
+      } else {
+        result.push({ value: nonZero[i].value, sources: [nonZero[i]], merged: false });
+        i++;
+      }
+    }
+    return result;
+  }
+
+  if (direction === "left" || direction === "right") {
+    for (let r = 0; r < 4; r++) {
+      let line = [];
+      for (let c = 0; c < 4; c++) {
+        line.push({ value: b[r][c], row: r, col: c });
+      }
+      if (direction === "right") line.reverse();
+      const processed = processLine(line);
+      // Map back to positions
+      const newRow = new Array(4).fill(0);
+      let pos = 0;
+      for (const item of processed) {
+        const targetC = direction === "right" ? 3 - pos : pos;
+        newRow[targetC] = item.value;
+        for (const src of item.sources) {
+          if (src.row !== r || src.col !== targetC) changed = true;
+          movements.push({
+            fromR: src.row, fromC: src.col,
+            toR: r, toC: targetC,
+            value: src.value,
+            merged: item.merged,
+            mergedValue: item.value,
+          });
+        }
+        if (item.merged) changed = true;
+        pos++;
+      }
+      if (!changed) {
+        for (let c = 0; c < 4; c++) {
+          if (b[r][c] !== newRow[c]) changed = true;
+        }
+      }
+      b[r] = newRow;
+    }
+  } else {
+    for (let c = 0; c < 4; c++) {
+      let line = [];
+      for (let r = 0; r < 4; r++) {
+        line.push({ value: b[r][c], row: r, col: c });
+      }
+      if (direction === "down") line.reverse();
+      const processed = processLine(line);
+      const newCol = new Array(4).fill(0);
+      let pos = 0;
+      for (const item of processed) {
+        const targetR = direction === "down" ? 3 - pos : pos;
+        newCol[targetR] = item.value;
+        for (const src of item.sources) {
+          if (src.row !== targetR || src.col !== c) changed = true;
+          movements.push({
+            fromR: src.row, fromC: src.col,
+            toR: targetR, toC: c,
+            value: src.value,
+            merged: item.merged,
+            mergedValue: item.value,
+          });
+        }
+        if (item.merged) changed = true;
+        pos++;
+      }
+      if (!changed) {
+        for (let r = 0; r < 4; r++) {
+          if (b[r][c] !== newCol[r]) changed = true;
+        }
+      }
+      for (let r = 0; r < 4; r++) b[r][c] = newCol[r];
+    }
+  }
+
+  return { newBoard: b, movements, changed };
+}
+
 // ── API helpers ────────────────────────────────────────────────────
 
 async function fetchState() {
-  // Check if session_id is provided in URL, if so, use it
   const urlSessionId = setSessionIdFromUrl("2048");
   const sid = urlSessionId || getSessionId("2048");
   sessionId.value = sid;
@@ -40,33 +155,115 @@ async function fetchState() {
     sessionId.value = data.session_id;
   }
   applyState(data);
-  // Also update log when fetching state (for polling to detect Agent actions)
   logRef.value?.fetchLog();
 }
 
 async function sendAction(move) {
+  if (isAnimating.value) return;
   lastAction.value = move;
   error.value = "";
-  lastUserActionTime = Date.now(); // Record user action time
-  const sid = sessionId.value || getSessionId("2048");
-  const url = addSessionToUrl(`${API}/action?move=${move}`, sid);
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.error) {
-    error.value = data.error;
+  lastUserActionTime = Date.now();
+
+  // Step 1: Simulate move locally for animation
+  const oldBoard = board.value.map(row => [...row]);
+  const { movements, changed } = simulateMove(oldBoard, move);
+
+  if (!changed) return; // No change, don't send
+
+  isAnimating.value = true;
+
+  // Step 2: Create animated tiles from movements
+  const animTiles = [];
+  const mergedPositions = new Set();
+
+  for (const m of movements) {
+    const tile = {
+      id: ++tileIdCounter,
+      value: m.value,
+      row: m.fromR, col: m.fromC,       // Start position
+      targetRow: m.toR, targetCol: m.toC, // End position
+      merged: m.merged,
+      mergedValue: m.mergedValue,
+      isNew: false,
+    };
+    animTiles.push(tile);
+    if (m.merged) {
+      mergedPositions.add(`${m.toR},${m.toC}`);
+    }
   }
-  if (data.session_id) {
-    sessionId.value = data.session_id;
-  }
-  applyState(data);
-  logRef.value?.fetchLog();
+
+  // Set tiles at start positions
+  tiles.value = animTiles.map(t => ({ ...t, row: t.row, col: t.col }));
+
+  // Step 3: Trigger slide animation (move to target positions)
+  await nextTick();
+  requestAnimationFrame(() => {
+    tiles.value = animTiles.map(t => ({ ...t, row: t.targetRow, col: t.targetCol }));
+  });
+
+  // Step 4: After slide completes, send to backend and apply real state
+  setTimeout(async () => {
+    const sid = sessionId.value || getSessionId("2048");
+    const url = addSessionToUrl(`${API}/action?move=${move}`, sid);
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.error) {
+      error.value = data.error;
+    }
+    if (data.session_id) {
+      sessionId.value = data.session_id;
+    }
+
+    // Apply backend state and find new tiles
+    const serverBoard = data.board;
+    const localBoard = simulateMove(oldBoard, move).newBoard;
+
+    // Build tiles from server board, mark new spawned tiles
+    const finalTiles = [];
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        if (serverBoard[r][c] !== 0) {
+          const wasInLocal = localBoard[r][c] === serverBoard[r][c];
+          const isMerged = mergedPositions.has(`${r},${c}`);
+          finalTiles.push({
+            id: ++tileIdCounter,
+            value: serverBoard[r][c],
+            row: r, col: c,
+            merged: isMerged,
+            isNew: !wasInLocal, // New tile spawned by backend
+          });
+        }
+      }
+    }
+
+    tiles.value = finalTiles;
+    board.value = serverBoard;
+    score.value = data.score;
+    gameOver.value = data.game_over;
+    won.value = data.won;
+    validActions.value = data.valid_actions || [];
+    if (data.difficulty) difficulty.value = data.difficulty;
+    if (data.max_tile !== undefined) maxTile.value = data.max_tile;
+    agentError.value = data.agent_error || "";
+
+    if (data.game_over) {
+      stopPolling();
+    }
+
+    // Clear animation flags after pop animation
+    setTimeout(() => {
+      tiles.value = tiles.value.map(t => ({ ...t, merged: false, isNew: false }));
+      isAnimating.value = false;
+    }, 200);
+
+    logRef.value?.fetchLog();
+  }, 150); // Match CSS transition duration
 }
 
 async function resetGame(newDifficulty) {
   if (newDifficulty) difficulty.value = newDifficulty;
   lastAction.value = "";
   error.value = "";
-  // Reset session ID to get a fresh game instance
   const sid = resetSessionId("2048");
   sessionId.value = sid;
   const url = addSessionToUrl(`${API}/reset?difficulty=${difficulty.value}`, sid);
@@ -88,12 +285,13 @@ function applyState(state) {
   if (state.difficulty) difficulty.value = state.difficulty;
   if (state.max_tile !== undefined) maxTile.value = state.max_tile;
   agentError.value = state.agent_error || "";
-  
-  // Stop polling if game is over
+
+  // Rebuild tiles from board (no animation)
+  tiles.value = boardToTiles(state.board);
+
   if (state.game_over) {
     stopPolling();
   } else {
-    // Ensure polling is active
     startPolling();
   }
 }
@@ -101,14 +299,8 @@ function applyState(state) {
 // ── Keyboard handling ──────────────────────────────────────────────
 
 const keyMap = {
-  ArrowUp: "up",
-  ArrowDown: "down",
-  ArrowLeft: "left",
-  ArrowRight: "right",
-  w: "up",
-  s: "down",
-  a: "left",
-  d: "right",
+  ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
+  w: "up", s: "down", a: "left", d: "right",
 };
 
 function onKeyDown(e) {
@@ -119,22 +311,18 @@ function onKeyDown(e) {
   }
 }
 
-// Polling interval to check for state changes (e.g., from Agent)
+// ── Polling ──────────────────────────────────────────────────────
+
 let pollingInterval = null;
-const POLLING_INTERVAL_MS = 1000; // Poll every 1 second
+const POLLING_INTERVAL_MS = 1000;
 let lastUserActionTime = 0;
-const USER_ACTION_COOLDOWN_MS = 500; // Don't poll immediately after user action
+const USER_ACTION_COOLDOWN_MS = 500;
 
 function startPolling() {
-  // Only poll if game is not over and interval not already set
   if (!pollingInterval && !gameOver.value) {
     pollingInterval = setInterval(async () => {
-      // Don't poll if user just performed an action (cooldown period)
-      const timeSinceLastAction = Date.now() - lastUserActionTime;
-      if (timeSinceLastAction < USER_ACTION_COOLDOWN_MS) {
-        return;
-      }
-      
+      if (Date.now() - lastUserActionTime < USER_ACTION_COOLDOWN_MS) return;
+      if (isAnimating.value) return;
       if (!gameOver.value) {
         await fetchState();
       } else {
@@ -154,7 +342,6 @@ function stopPolling() {
 onMounted(() => {
   fetchState();
   window.addEventListener("keydown", onKeyDown);
-  // Start polling to detect Agent actions
   startPolling();
 });
 
@@ -180,12 +367,25 @@ const tileColors = {
   2048: { bg: "#edc22e", fg: "#f9f6f2" },
 };
 
-function tileStyle(value) {
-  const c = tileColors[value] || { bg: "#3c3a32", fg: "#f9f6f2" };
+function tileStyle(tile) {
+  const c = tileColors[tile.value] || { bg: "#3c3a32", fg: "#f9f6f2" };
+  // Grid has 4 cells with 8px gaps, inside 8px padding
+  // Use the grid-cell positions: each cell is at (col/4) of the inner area
+  // Inner area = 100% - 16px padding (8px each side)
+  // Cell width = (innerWidth - 3*8px gap) / 4
+  // Cell left = padding + col * (cellWidth + gap)
+  // Simplified: position as percentage of board including padding
+  const cellPercent = 'calc((100% - 40px) / 4)'; // (board - 2*padding - 3*gaps) / 4 = (100% - 16px - 24px) / 4
+  const topVal = `calc(8px + ${tile.row} * (((100% - 16px - 24px) / 4) + 8px))`;
+  const leftVal = `calc(8px + ${tile.col} * (((100% - 16px - 24px) / 4) + 8px))`;
   return {
     backgroundColor: c.bg,
     color: c.fg,
-    fontSize: value >= 1024 ? "1.4rem" : value >= 128 ? "1.6rem" : "1.9rem",
+    fontSize: tile.value >= 1024 ? "1.4rem" : tile.value >= 128 ? "1.6rem" : "1.9rem",
+    top: topVal,
+    left: leftVal,
+    width: 'calc((100% - 16px - 24px) / 4)',
+    height: 'calc((100% - 16px - 24px) / 4)',
   };
 }
 </script>
@@ -221,54 +421,36 @@ function tileStyle(value) {
 
     <!-- Board -->
     <div class="board">
-      <div v-for="(row, r) in board" :key="r" class="row">
-        <div
-          v-for="(cell, c) in row"
-          :key="c"
-          class="cell"
-          :style="tileStyle(cell)"
-        >
-          {{ cell || "" }}
-        </div>
+      <!-- Background grid cells -->
+      <div class="grid-bg">
+        <div v-for="i in 16" :key="'bg'+i" class="grid-cell"></div>
+      </div>
+      <!-- Animated tiles -->
+      <div
+        v-for="tile in tiles"
+        :key="tile.id"
+        class="tile"
+        :class="{ 'tile-merged': tile.merged, 'tile-new': tile.isNew }"
+        :style="tileStyle(tile)"
+      >
+        {{ tile.value }}
       </div>
     </div>
 
     <!-- Controls (for mobile / click) -->
     <div class="controls">
       <div class="controls-row">
-        <button
-          :disabled="!validActions.includes('up')"
-          @click="sendAction('up')"
-        >
-          Up
-        </button>
+        <button :disabled="!validActions.includes('up')" @click="sendAction('up')">Up</button>
       </div>
       <div class="controls-row">
-        <button
-          :disabled="!validActions.includes('left')"
-          @click="sendAction('left')"
-        >
-          Left
-        </button>
-        <button
-          :disabled="!validActions.includes('down')"
-          @click="sendAction('down')"
-        >
-          Down
-        </button>
-        <button
-          :disabled="!validActions.includes('right')"
-          @click="sendAction('right')"
-        >
-          Right
-        </button>
+        <button :disabled="!validActions.includes('left')" @click="sendAction('left')">Left</button>
+        <button :disabled="!validActions.includes('down')" @click="sendAction('down')">Down</button>
+        <button :disabled="!validActions.includes('right')" @click="sendAction('right')">Right</button>
       </div>
     </div>
 
-    <!-- Hint for keyboard -->
     <p class="hint">Use arrow keys or WASD to play</p>
 
-    <!-- Log -->
     <GameLog ref="logRef" game-name="2048" :session-id="sessionId" />
   </div>
 </template>
@@ -316,6 +498,7 @@ function tileStyle(value) {
   padding: 8px 20px;
   color: #fff;
   text-align: center;
+  min-width: 90px;
 }
 
 .score-box .label {
@@ -342,9 +525,7 @@ function tileStyle(value) {
   cursor: pointer;
 }
 
-.reset-btn:hover {
-  background: #776e65;
-}
+.reset-btn:hover { background: #776e65; }
 
 .banner {
   text-align: center;
@@ -354,21 +535,9 @@ function tileStyle(value) {
   font-weight: 700;
   font-size: 1.1rem;
 }
-
-.banner.won {
-  background: #edc22e;
-  color: #f9f6f2;
-}
-
-.banner.over {
-  background: #f67c5f;
-  color: #f9f6f2;
-}
-
-.banner.error {
-  background: #f44;
-  color: #fff;
-}
+.banner.won { background: #edc22e; color: #f9f6f2; }
+.banner.over { background: #f67c5f; color: #f9f6f2; }
+.banner.error { background: #f44; color: #fff; }
 
 .agent-error {
   text-align: center;
@@ -382,31 +551,61 @@ function tileStyle(value) {
   border: 1px solid #991b1b;
 }
 
+/* Board */
 .board {
+  position: relative;
   background: #bbada0;
   border-radius: 8px;
   padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.row {
-  display: flex;
-  gap: 8px;
-}
-
-.cell {
-  width: 100%;
   aspect-ratio: 1;
+}
+
+.grid-bg {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+}
+
+.grid-cell {
+  background: #cdc1b4;
+  border-radius: 6px;
+}
+
+/* Animated tiles */
+.tile {
+  position: absolute;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 6px;
   font-weight: 700;
-  font-size: 1.9rem;
   user-select: none;
-  transition: background-color 0.12s, transform 0.12s;
+  transition: top 0.15s ease, left 0.15s ease;
+  z-index: 1;
+}
+
+.tile-merged {
+  animation: tile-pop 0.2s ease;
+  z-index: 2;
+}
+
+.tile-new {
+  animation: tile-appear 0.2s ease;
+  z-index: 2;
+}
+
+@keyframes tile-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+@keyframes tile-appear {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .controls {
@@ -434,24 +633,13 @@ function tileStyle(value) {
   cursor: pointer;
 }
 
-.controls button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.controls button:not(:disabled):hover {
-  background: #776e65;
-}
+.controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+.controls button:not(:disabled):hover { background: #776e65; }
 
 .hint {
   text-align: center;
   margin-top: 12px;
   font-size: 0.85rem;
   color: #bbada0;
-}
-
-.last-action {
-  margin-top: 4px;
-  font-style: italic;
 }
 </style>

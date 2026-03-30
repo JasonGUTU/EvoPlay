@@ -69,7 +69,7 @@ class SlidingPuzzle(BaseGame):
     name = "sliding_puzzle"
 
     def __init__(self):
-        self.difficulty = "medium"
+        self.difficulty = "hard"
         self.board: list[list[int]] = []
         self.score = 0
         self.moves = 0

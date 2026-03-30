@@ -36,9 +36,9 @@ VALID_DIFFICULTIES = {"easy", "medium", "hard"}
 # Difficulty controls tile sampling spread (higher = more random/harder)
 # temp_base: base temperature for distribution, small_penalty: weight for tiles <=8
 DIFF_PARAMS = {
-    "easy":   {"temp_base": 1.0,  "temp_high": 0.85, "small_pen": 0.55, "high_pen": 0.12, "max_pen": 0.02},
-    "medium": {"temp_base": 1.5,  "temp_high": 1.2,  "small_pen": 0.70, "high_pen": 0.25, "max_pen": 0.08},
-    "hard":   {"temp_base": 2.5,  "temp_high": 2.0,  "small_pen": 0.90, "high_pen": 0.40, "max_pen": 0.15},
+    "easy":   {"temp_base": 1.0,  "temp_high": 0.85, "small_pen": 0.55, "high_pen": 0.12, "max_pen": 0.02, "min_max": 0},
+    "medium": {"temp_base": 2.5,  "temp_high": 2.0,  "small_pen": 0.90, "high_pen": 0.40, "max_pen": 0.15, "min_max": 0},
+    "hard":   {"temp_base": 2.5,  "temp_high": 2.0,  "small_pen": 0.90, "high_pen": 0.40, "max_pen": 0.15, "min_max": 64},
 }
 
 
@@ -61,7 +61,7 @@ class MergeFall(BaseGame):
         self.score: int = 0
         self.game_over: bool = False
         self.next_tile: int = 2
-        self.difficulty: str = "easy"
+        self.difficulty: str = "hard"
         self._active_pos: Tuple[int, int] | None = None
         self._reset_log()
         self.reset()
@@ -316,10 +316,15 @@ Note: Even if a column looks full, dropping into it might trigger merges that cl
 
     def _sample_next_tile(self) -> int:
         M = self._current_max_tile()
+        dp = DIFF_PARAMS.get(self.difficulty, DIFF_PARAMS["easy"])
+
+        # Hard mode: treat M as at least min_max so large tiles can appear from the start
+        min_max = dp.get("min_max", 0)
+        if min_max > 0:
+            M = max(M, min_max)
+
         if M < 2:
             return 2
-
-        dp = DIFF_PARAMS.get(self.difficulty, DIFF_PARAMS["easy"])
 
         max_exp = int(math.log2(M))
         candidates = [1 << e for e in range(1, max_exp + 1)]

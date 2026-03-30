@@ -28,7 +28,7 @@ class Game2048(BaseGame):
         self.score: int = 0
         self.game_over: bool = False
         self.won: bool = False
-        self.difficulty: str = "medium"
+        self.difficulty: str = "hard"
         self.max_tile: int = 0
         self._reset_log()
         self.reset()

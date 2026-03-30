@@ -17,6 +17,7 @@ const humanCount = ref(2);
 const botCount = ref(2);
 const error = ref("");
 const agentError = ref("");
+const passMessage = ref("");
 const hoverCell = ref(null);   // [r, c]
 const isThinking = ref(false);
 const difficulty = ref("hard");
@@ -75,11 +76,8 @@ async function placeDisc(r, c) {
 
   if (!data1.bot_pending) { isThinking.value = false; return; }
 
-  // Phase 2: fetch bot move, let applyState diff handle animation
-  await new Promise(resolve => setTimeout(resolve, 400));
-  const res2 = await fetch(addSessionToUrl(`${API}/bot_move`, sid));
-  const data2 = await res2.json();
-  applyState(data2);
+  // Phase 2: bot moves (may loop if human has to pass multiple times)
+  await botMoveLoop(sid);
   isThinking.value = false;
 }
 
@@ -132,6 +130,71 @@ function applyState(state) {
   botCount.value = state.bot_count ?? 2;
   if (state.difficulty) difficulty.value = state.difficulty;
   agentError.value = state.agent_error || "";
+
+  // Auto-pass when human has no valid moves but game isn't over
+  if (!state.game_over && !isWatching.value && !isThinking.value
+      && validActions.value.length === 1 && validActions.value[0] === "pass") {
+    setTimeout(() => autoPass(), 600);
+  }
+}
+
+async function autoPass() {
+  if (gameOver.value || isThinking.value) return;
+  isThinking.value = true;
+
+  // Show pass message
+  passMessage.value = "You have no valid moves — pass!";
+
+  const sid = sessionId.value || getSessionId("othello6");
+
+  // Wait so user can read the message
+  await new Promise(resolve => setTimeout(resolve, 800));
+
+  // Send pass action
+  const res1 = await fetch(addSessionToUrl(`${API}/action?move=pass`, sid));
+  const data1 = await res1.json();
+  applyState(data1);
+
+  passMessage.value = "";
+
+  if (!data1.bot_pending) { isThinking.value = false; return; }
+
+  // Bot may need to play multiple turns if human keeps having no moves
+  await botMoveLoop(sid);
+  isThinking.value = false;
+}
+
+async function botMoveLoop(sid) {
+  // Keep letting bot play as long as it has pending moves
+  while (true) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const res = await fetch(addSessionToUrl(`${API}/bot_move`, sid));
+    const data = await res.json();
+    applyState(data);
+
+    // Wait for flip animation to complete
+    await new Promise(resolve => setTimeout(resolve, 600));
+
+    if (data.game_over) break;
+
+    // Check if human still needs to pass
+    if (validActions.value.length === 1 && validActions.value[0] === "pass") {
+      passMessage.value = "You have no valid moves — pass!";
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const passRes = await fetch(addSessionToUrl(`${API}/action?move=pass`, sid));
+      const passData = await passRes.json();
+      applyState(passData);
+      passMessage.value = "";
+
+      if (!passData.bot_pending) break;
+      // Continue loop — bot plays again
+    } else {
+      // Human has moves, stop the loop
+      break;
+    }
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -236,6 +299,7 @@ onUnmounted(stopPolling);
     </div>
 
     <div v-if="error" class="error-msg">{{ error }}</div>
+    <div v-if="passMessage" class="banner pass">{{ passMessage }}</div>
     <div v-if="agentError" class="agent-error">Agent Error: {{ agentError }}</div>
 
     <!-- Legend -->
@@ -410,6 +474,18 @@ onUnmounted(stopPolling);
 .btn-reset:hover { background: #475569; }
 
 .error-msg { color: #f87171; font-size: 0.85rem; }
+
+.banner.pass {
+  text-align: center;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  background: #854d0e;
+  color: #fde68a;
+  border: 1px solid #a16207;
+}
 
 .agent-error {
   text-align: center;

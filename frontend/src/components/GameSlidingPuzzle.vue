@@ -14,7 +14,7 @@ const won = ref(false);
 const validActions = ref([]);
 const error = ref("");
 const agentError = ref("");
-const difficulty = ref("medium");
+const difficulty = ref("hard");
 const isWatching = ref(false);
 let pollTimer = null;
 
