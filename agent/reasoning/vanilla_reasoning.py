@@ -120,6 +120,7 @@ Pick the best action. Respond with ONLY the action string, nothing else."""
             self.last_raw_response = raw_response
             self.last_action = action
             self.last_fallback = fallback
+            self.last_usage = getattr(self.llm, "last_usage", {"input_tokens": 0, "output_tokens": 0})
 
             return action
 

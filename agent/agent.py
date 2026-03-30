@@ -193,7 +193,7 @@ class Agent:
         log_path = game_dir / f"{safe_sid}.csv"
         self._llm_log_file = open(log_path, "w", encoding="utf-8", newline="")
         self._llm_log_writer = csv.writer(self._llm_log_file)
-        self._llm_log_writer.writerow(["step", "raw_response", "parsed_action", "fallback", "valid_actions"])
+        self._llm_log_writer.writerow(["step", "raw_response", "parsed_action", "fallback", "valid_actions", "input_tokens", "output_tokens"])
 
     def _write_llm_log(self, step: int) -> None:
         """Write one LLM response entry."""
@@ -204,7 +204,8 @@ class Agent:
         action = getattr(self.reasoning, "last_action", "")
         fallback = getattr(self.reasoning, "last_fallback", False)
         valid = getattr(self, "_last_valid_actions", [])
-        self._llm_log_writer.writerow([step, raw, action, fallback, "|".join(valid)])
+        usage = getattr(self.reasoning, "last_usage", {"input_tokens": 0, "output_tokens": 0})
+        self._llm_log_writer.writerow([step, raw, action, fallback, "|".join(valid), usage["input_tokens"], usage["output_tokens"]])
         self._llm_log_file.flush()
 
     # ── Step logic ────────────────────────────────────────────────────

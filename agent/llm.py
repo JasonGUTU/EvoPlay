@@ -154,7 +154,14 @@ class LLM:
             messages=full_messages,
             **call_kwargs
         )
-        
+
+        # Store token usage from response
+        usage = getattr(response, "usage", None)
+        self.last_usage = {
+            "input_tokens": getattr(usage, "prompt_tokens", 0) if usage else 0,
+            "output_tokens": getattr(usage, "completion_tokens", 0) if usage else 0,
+        }
+
         return response.choices[0].message.content.strip()
     
     def simple_call(self, prompt: str, system_message: str | None = None, **kwargs: Any) -> str:

@@ -49,7 +49,14 @@ log = logging.getLogger("evoplay")
 
 # ── App setup ───────────────────────────────────────────────────────
 
-app = Flask(__name__)
+import os
+
+# In production, serve the built frontend static files
+FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if FRONTEND_DIST.exists():
+    app = Flask(__name__, static_folder=str(FRONTEND_DIST), static_url_path="/")
+else:
+    app = Flask(__name__)
 CORS(app)
 
 # Registry: add more games here.
@@ -319,7 +326,19 @@ def list_players():
 
 
 
+# ── Serve frontend SPA ─────────────────────────────────────────────
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_frontend(path):
+    """Serve Vue SPA. API routes are handled above, everything else goes to index.html."""
+    if path and (FRONTEND_DIST / path).exists():
+        return app.send_static_file(path)
+    return app.send_static_file("index.html")
+
+
 # ── Entry point ─────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    debug = os.environ.get("FLASK_DEBUG", "1") == "1"
+    app.run(host="0.0.0.0", port=5001, debug=debug)

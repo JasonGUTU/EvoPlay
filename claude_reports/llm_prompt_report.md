@@ -1,68 +1,74 @@
 # EvoPlay LLM Prompt 报告
 
-本报告记录 EvoPlay 平台中各游戏调用大语言模型时使用的 prompt 结构。所有游戏共享同一套 prompt 框架（定义在 `agent/reasoning/vanilla_reasoning.py`），但各游戏通过 `get_rules()` 提供不同的规则文本。
+本报告记录 EvoPlay 平台中 8 个游戏调用大语言模型时，给模型提供了哪些信息，以及这些信息的具体形式。每个游戏均附带一个**真实完整 prompt 示例**，即实际传给模型的 System Message + User Prompt。
 
 ---
 
-## 1. Prompt 框架
+## 1. 通用 Prompt 结构
 
-### 1.1 System Message
+每次调用 LLM 时，发送两部分信息：**System Message** 和 **User Prompt**。
+
+### System Message（固定不变）
 
 ```
 You are a game-playing AI agent. Respond with only the action string.
 ```
 
-**说明**：System message 极简，仅告知模型角色和输出格式要求。
+### User Prompt（每步动态生成）
 
-### 1.2 User Prompt 模板
+由以下 4 个信息块拼接而成：
+
+| 信息块 | 内容 | 来源 |
+|--------|------|------|
+| **游戏规则** | 游戏目标、玩法、操作格式 | 每个游戏的 `get_rules()` 方法，固定文本 |
+| **当前棋盘** | 数字矩阵，空格分隔 | `get_state()` 返回的 `board` 字段 |
+| **当前分数** | 单个数字或字符串 | `get_state()` 返回的 `score` 字段 |
+| **合法操作列表** | 逗号分隔的字符串列表 | `valid_actions()` 方法的返回值 |
+
+MergeFall 额外提供一个信息：**下一个方块的数值**（`next_tile`）。
+
+完整模板（代码位于 `agent/reasoning/vanilla_reasoning.py`）：
 
 ```
-You are playing the game "{game_name}".
+You are playing the game "{游戏名}".
 
 GAME RULES:
-{rules}
+{规则全文}
 
 Current board:
-{formatted_board}
-Score: {score}
-
+{棋盘矩阵}
+Score: {分数}
+{额外信息（如有）}
 IMPORTANT: You MUST choose exactly one action from this list (copy it exactly):
-[{valid_actions}]
+[{合法操作列表}]
 
 Pick the best action. Respond with ONLY the action string, nothing else.
 ```
 
-**说明**：
+---
 
-- `{game_name}`：游戏名称，如 `"othello6"`, `"tictactoe"` 等
-- `{rules}`：由各游戏的 `get_rules()` 方法返回，包含完整的规则描述、棋盘说明、可用操作格式和策略提示
-- `{formatted_board}`：当前棋盘状态，2D 棋盘以空格分隔的数字矩阵呈现（如 `0 0 1\n0 2 0\n1 0 0`）
-- `{score}`：当前分数
-- `{valid_actions}`：合法操作列表，逗号分隔（如 `1 2, 3 4, 4 3`）
-- 末尾强调"必须从列表中选择"和"只返回 action 字符串"
+## 2. 各游戏完整 Prompt 示例
 
-### 1.3 输出验证与 Fallback
-
-模型返回后，系统执行以下验证：
-
-1. `strip()` 去除首尾空白
-2. 检查是否在 `valid_actions` 列表中
-3. 若匹配失败，fallback 到 `valid_actions[0]`（列表第一个合法操作）
-4. 记录 `raw_response`、`parsed_action`、`fallback` 到 `llm_logs/` CSV 文件
+以下每个游戏给出一个**真实场景**下传给模型的完整输入（System Message + User Prompt），与代码实际拼接结果一致。
 
 ---
 
-## 2. 各游戏 Rules Prompt
-
 ### 2.1 2048
 
-**游戏类型**：单人滑块合并游戏（4×4 棋盘）
+**场景描述**：游戏中局，已有若干方块，分数 24，只有三个方向可移动。
 
-**动作空间**：`["up", "down", "left", "right"]` 的子集（仅包含能改变棋盘的方向）
-
-**Rules Prompt**：
+**System Message：**
 
 ```
+You are a game-playing AI agent. Respond with only the action string.
+```
+
+**User Prompt：**
+
+```
+You are playing the game "2048".
+
+GAME RULES:
 2048 Game Rules
 
 OBJECTIVE:
@@ -73,7 +79,7 @@ GAMEPLAY:
 - On each turn, you slide all tiles in one of four directions: up, down, left, or right.
 - When you slide, all tiles move as far as possible in that direction until they hit the edge or another tile.
 - If two tiles with the same number collide while moving, they merge into a single tile with double the value.
-- After each move, a new tile (either 2 with 90% probability or 4 with 10% probability) appears in a random empty cell.
+- After each move, a new tile (either 2 or 4) appears in a random empty cell.
 
 AVAILABLE ACTIONS:
 You can choose one of four directions:
@@ -90,24 +96,43 @@ The game ends when:
 2. No valid moves are possible (no tiles can merge in any direction)
 
 When the game is over, you cannot make any more moves. Your final score is the sum of all merged tile values.
+
+
+Current board:
+0 0 2 0
+0 0 0 0
+0 4 0 2
+0 0 2 4
+Score: 24
+
+IMPORTANT: You MUST choose exactly one action from this list (copy it exactly):
+[up, down, left]
+
+Pick the best action. Respond with ONLY the action string, nothing else.
 ```
 
-**Prompt 特点**：
-- 动作空间最小（最多 4 个方向），模型出错概率低
-- 没有对手，纯策略优化问题
-- 模型需要理解"合并"和"重力"机制来做出好的决策
+**模型不知道的信息**：
+- 当前难度设置（Easy/Medium/Hard 影响的是新方块出 4 的概率）
+- 下一步会生成什么方块、生成在哪个位置
 
 ---
 
 ### 2.2 MergeFall
 
-**游戏类型**：单人掉落合并游戏（5×6 棋盘）
+**场景描述**：游戏中局，底部有一些方块，下一个要掉落的方块是 4，分数 36。
 
-**动作空间**：`["drop 0", "drop 1", "drop 2", "drop 3", "drop 4"]`
-
-**Rules Prompt**：
+**System Message：**
 
 ```
+You are a game-playing AI agent. Respond with only the action string.
+```
+
+**User Prompt：**
+
+```
+You are playing the game "mergefall".
+
+GAME RULES:
 MergeFall Game Rules
 
 OBJECTIVE:
@@ -140,24 +165,111 @@ The game ends when:
 - This happens when a column becomes completely full and cannot accommodate the dropped tile.
 
 Note: Even if a column looks full, dropping into it might trigger merges that clear space. However, if the column is truly full (including the overflow row), the game ends immediately.
+
+
+Current board:
+0 0 0 0 0
+0 0 0 0 0
+0 0 0 0 0
+0 0 0 0 0
+0 4 0 0 0
+2 8 2 0 0
+Score: 36
+
+Next tile to drop: 4
+
+IMPORTANT: You MUST choose exactly one action from this list (copy it exactly):
+[drop 0, drop 1, drop 2, drop 3, drop 4]
+
+Pick the best action. Respond with ONLY the action string, nothing else.
 ```
 
-**Prompt 特点**：
-- 动作空间固定为 5 个列，格式为 `"drop N"`
-- 合并机制较复杂（链式吸收 + 重力），模型需要推理多步连锁反应
-- 额外说明了 shorthand 格式（纯数字也可以），提高模型兼容性
+**模型不知道的信息**：
+- 当前难度设置（影响生成方块的数值分布）
+- 未来会生成什么方块（只知道当前这一个 next_tile）
 
 ---
 
-### 2.3 Othello 6×6
+### 2.3 Four in a Row
 
-**游戏类型**：双人对弈（6×6 棋盘，LLM 执黑 vs Minimax Bot 执白）
+**场景描述**：游戏进行了几步，LLM（玩家 1）和 Bot（玩家 2）各下了几子。
 
-**动作空间**：动态变化，格式为 `"row col"`（如 `"2 3"`），每步通常 3-10 个合法位置
-
-**Rules Prompt**：
+**System Message：**
 
 ```
+You are a game-playing AI agent. Respond with only the action string.
+```
+
+**User Prompt：**
+
+```
+You are playing the game "fourinarow".
+
+GAME RULES:
+Four in a Row (Connect Four) Game Rules
+
+OBJECTIVE:
+Drop pieces into a 6-row × 7-column vertical grid. First player to connect 4 of their pieces in a row (horizontally, vertically, or diagonally) wins.
+
+PLAYERS:
+- You are player 1 (displayed as "1" on the board). You move first each turn.
+- The bot is player 2 (displayed as "2" on the board). It moves automatically after you.
+
+BOARD:
+- The board is a 6×7 grid. Row 0 is the top, row 5 is the bottom.
+- Empty cells are 0, your pieces are 1, bot pieces are 2.
+- Pieces obey gravity: they fall to the lowest empty cell in the chosen column.
+
+AVAILABLE ACTIONS:
+- You will be given a list of valid columns. You MUST pick exactly one from that list — do NOT invent your own.
+- Choose a column number from 0 to 6 (e.g., "3" to drop in the center column).
+- A column is only valid if it is not completely filled (row 0 is not occupied).
+
+GAME OVER CONDITIONS:
+- You win if you connect 4 of your pieces in any direction.
+- Bot wins if it connects 4 of its pieces.
+- Draw if the board is completely filled with no winner.
+
+Respond with ONLY the column number (e.g., "3").
+
+
+Current board:
+0 0 0 0 0 0 0
+0 0 0 0 0 0 0
+0 0 0 0 0 0 0
+0 0 0 0 0 0 0
+0 0 0 1 0 0 0
+0 0 2 1 2 0 0
+Score: 0
+
+IMPORTANT: You MUST choose exactly one action from this list (copy it exactly):
+[0, 1, 2, 3, 4, 5, 6]
+
+Pick the best action. Respond with ONLY the action string, nothing else.
+```
+
+**模型不知道的信息**：
+- Bot 使用的算法和搜索深度（Easy = 规则启发，Medium = Minimax 深度 3，Hard = 深度 5）
+- Bot 的下一步落子位置
+
+---
+
+### 2.4 Othello 6×6
+
+**场景描述**：游戏开局，棋盘中央有初始 4 子，LLM 执黑先手，有 4 个合法落子位置。
+
+**System Message：**
+
+```
+You are a game-playing AI agent. Respond with only the action string.
+```
+
+**User Prompt：**
+
+```
+You are playing the game "othello6".
+
+GAME RULES:
 Othello 6×6 (Mini Reversi) Game Rules
 
 OBJECTIVE:
@@ -180,35 +292,50 @@ AVAILABLE ACTIONS:
 - Action format: "row col" (0-indexed). For example, "1 3" means row 1, column 3.
 - Only positions that flip at least one opponent piece are valid moves.
 
-STRATEGY TIPS:
-- Corners (0 0, 0 5, 5 0, 5 5) are extremely valuable — they can never be flipped once taken.
-- Avoid placing pieces on squares adjacent to empty corners (especially diagonal neighbors).
-- Mobility matters: keep more moves available for yourself while restricting your opponent.
-
 GAME OVER CONDITIONS:
 - The game ends when neither player has a valid move (usually when the board is full).
 - The player with more pieces wins. Equal counts result in a draw.
 
 Respond with ONLY "row col" (e.g., "1 3").
+
+
+Current board:
+0 0 0 0 0 0
+0 0 0 0 0 0
+0 0 2 1 0 0
+0 0 1 2 0 0
+0 0 0 0 0 0
+0 0 0 0 0 0
+Score: 2:2
+
+IMPORTANT: You MUST choose exactly one action from this list (copy it exactly):
+[1 2, 2 1, 3 4, 4 3]
+
+Pick the best action. Respond with ONLY the action string, nothing else.
 ```
 
-**Prompt 特点**：
-- 明确强调"必须从给定的合法位置列表中选择"，防止模型凭空想象位置
-- 包含策略提示（角落价值、避开 X-square、mobility），引导模型做出更好的决策
-- 6×6 棋盘比 8×8 更适合 LLM：board 信息更短，token 消耗更少，模型更容易理解全局局面
-- 翻转机制用自然语言描述（8 个方向夹击），是 prompt 中最复杂的规则部分
+**模型不知道的信息**：
+- Bot 使用的评估函数（Easy = 随机，Medium = 位置权重矩阵，Hard = 位置权重 + 行动力）
+- Bot 的搜索深度和具体策略
 
 ---
 
-### 2.4 Tic Tac Toe
+### 2.5 Tic Tac Toe
 
-**游戏类型**：双人对弈（3×3 棋盘，LLM 执 X vs Minimax Bot 执 O）
+**场景描述**：游戏中局，LLM（X=1）和 Bot（O=2）各下了两步，还有 5 个空位。
 
-**动作空间**：动态变化，格式为 `"row col"`（如 `"1 1"`），最多 9 个位置
-
-**Rules Prompt**：
+**System Message：**
 
 ```
+You are a game-playing AI agent. Respond with only the action string.
+```
+
+**User Prompt：**
+
+```
+You are playing the game "tictactoe".
+
+GAME RULES:
 Tic Tac Toe Game Rules
 
 OBJECTIVE:
@@ -232,123 +359,111 @@ AVAILABLE ACTIONS:
 - Action format: "row col" (e.g., "1 1" for the center cell).
 - You can only place on empty cells (value 0).
 
-STRATEGY TIPS:
-- The center (1 1) is the strongest opening move.
-- Corners (0 0, 0 2, 2 0, 2 2) are the second best positions.
-- Try to create a "fork" — two ways to win simultaneously — so the opponent can only block one.
-
 GAME OVER CONDITIONS:
 - You win by getting 3 of your marks in a row (any direction).
 - Bot wins by getting 3 of its marks in a row.
 - Draw if all 9 cells are filled with no winner.
 
 Respond with ONLY "row col" (e.g., "1 1").
+
+
+Current board:
+1 0 2
+0 1 0
+0 0 2
+Score: 0
+
+IMPORTANT: You MUST choose exactly one action from this list (copy it exactly):
+[0 1, 1 0, 1 2, 2 0, 2 1]
+
+Pick the best action. Respond with ONLY the action string, nothing else.
 ```
 
-**Prompt 特点**：
-- 棋盘最小（3×3），信息最精简，token 消耗最低
-- 提供了可视化的位置参考图（ASCII 棋盘布局），帮助模型理解坐标映射
-- 策略提示包含"fork"概念，这是井字棋中的核心高级策略
-- Hard 难度的 bot 使用完整 Minimax（已解决的游戏），LLM 最好结果是平局
+**模型不知道的信息**：
+- Bot 使用的算法（Easy = 随机，Medium = 赢/堵启发，Hard = 完整 Minimax 不可战胜）
 
 ---
 
-### 2.5 Four in a Row
+### 2.6 Sliding Puzzle
 
-**游戏类型**：双人对弈（6×7 棋盘，LLM 执先手 vs Minimax Bot）
+**场景描述**：8-puzzle 游戏开局，方块被打乱，空格（0）在中间，已走 3 步。
 
-**动作空间**：动态变化，格式为列号 `"0"` - `"6"`，最多 7 个选择
-
-**Rules Prompt**：
+**System Message：**
 
 ```
-Four in a Row (Connect Four) Game Rules
+You are a game-playing AI agent. Respond with only the action string.
+```
+
+**User Prompt：**
+
+```
+You are playing the game "sliding_puzzle".
+
+GAME RULES:
+Sliding Puzzle (8-Puzzle) Game Rules
 
 OBJECTIVE:
-Drop pieces into a 6-row × 7-column vertical grid. First player to connect 4 of their pieces in a row (horizontally, vertically, or diagonally) wins.
-
-PLAYERS:
-- You are player 1 (displayed as "1" on the board). You move first each turn.
-- The bot is player 2 (displayed as "2" on the board). It moves automatically after you.
-
-BOARD:
-- The board is a 6×7 grid. Row 0 is the top, row 5 is the bottom.
-- Empty cells are 0, your pieces are 1, bot pieces are 2.
-- Pieces obey gravity: they fall to the lowest empty cell in the chosen column.
-
-AVAILABLE ACTIONS:
-- You will be given a list of valid columns. You MUST pick exactly one from that list — do NOT invent your own.
-- Choose a column number from 0 to 6 (e.g., "3" to drop in the center column).
-- A column is only valid if it is not completely filled (row 0 is not occupied).
-
-STRATEGY TIPS:
-- Control the center column (column 3) for more connection opportunities.
-- Look for opportunities to create two-way threats (two ways to win).
-- Block the opponent when they have 3 in a row with an open end.
-
-GAME OVER CONDITIONS:
-- You win if you connect 4 of your pieces in any direction.
-- Bot wins if it connects 4 of its pieces.
-- Draw if the board is completely filled with no winner.
-
-Respond with ONLY the column number (e.g., "3").
-```
-
-**Prompt 特点**：
-- 动作格式最简单（单个数字 0-6），模型格式出错概率最低
-- 明确说明了重力机制（棋子下落到最低空位），这是 Four in a Row 与其他棋盘游戏的核心区别
-- 策略提示覆盖了进攻（中心控制、双向威胁）和防守（阻挡三连）
-
----
-
-## 3. Prompt 设计总结
-
-### 2.6 Sokoban
-
-**游戏类型**：单人推箱子解谜游戏（多关卡，棋盘大小随关卡变化）
-
-**动作空间**：`["up", "down", "left", "right", "undo"]`，通关后追加 `"next_level"`
-
-**Rules Prompt**：
-
-```
-Sokoban Game Rules
-
-OBJECTIVE:
-Push all boxes onto the goal squares.
+Arrange the numbered tiles 1-8 in order by sliding them into the empty space. The goal state is:
+  1 2 3
+  4 5 6
+  7 8 _
+where _ is the empty space (shown as 0 on the board).
 
 GAMEPLAY:
-- You control the player character (hardhat worker).
-- You can move up, down, left, or right into empty spaces.
-- You can push a single box by moving into it, provided the space behind the box is empty or a goal.
-- You CANNOT pull boxes.
-- You CANNOT push a box into a wall, the rope obstacle, or another box.
-- You have 1 Undo available per game.
+- The board is a 3×3 grid with tiles numbered 1-8 and one empty space (0).
+- Each turn, you slide one tile adjacent to the empty space into it.
+- The direction you choose refers to which direction a tile moves INTO the empty space:
+  - "up": the tile BELOW the blank slides up
+  - "down": the tile ABOVE the blank slides down
+  - "left": the tile to the RIGHT of the blank slides left
+  - "right": the tile to the LEFT of the blank slides right
 
 AVAILABLE ACTIONS:
-- "up", "down", "left", "right": Move the player or push a box.
-- "undo": Reverts the last move.
+- You will be given a list of valid directions. You MUST pick exactly one from that list.
+- Directions: "up", "down", "left", "right"
+- Not all directions are available every turn (depends on blank position).
+
+GAME OVER CONDITIONS:
+- You win when all tiles are in the goal arrangement.
+- There is no losing — only the number of moves matters (lower is better).
+
+Respond with ONLY the direction (e.g., "up").
+
+
+Current board:
+1 2 3
+4 0 6
+7 5 8
+Score: 3
+
+IMPORTANT: You MUST choose exactly one action from this list (copy it exactly):
+[up, down, left, right]
+
+Pick the best action. Respond with ONLY the action string, nothing else.
 ```
 
-**Prompt 特点**：
-- 动作空间与 2048 类似（方向 + undo），格式简单，模型不容易出格式错误
-- 棋盘表示较特殊：包含多种符号（`#` 墙壁、`O` 障碍、`W` 水障碍、`.` 目标），模型需要理解空间布局
-- 有 **undo 机制**（每局 1 次），这是其他游戏没有的操作——模型理论上可以利用 undo 纠正错误推箱
-- **多关卡系统**（10 关），通关后 `valid_actions` 变为 `["next_level"]`，模型需要识别并发送此指令
-- 规则中强调了"不能拉箱子"和"不能推进墙或其他箱子"，这些是 Sokoban 的核心约束，也是 LLM 最容易违反的规则（但后端会做 valid_actions 过滤）
-- 没有策略提示——Sokoban 的策略高度依赖具体关卡布局，通用 tips 帮助不大
+**模型不知道的信息**：
+- 最优解的步数
+- 当前难度设置（影响初始打乱的步数）
 
 ---
 
-### 2.7 Nuts & Bolts
+### 2.7 Nuts and Bolts
 
-**游戏类型**：单人颜色排序解谜游戏（多关卡，螺丝数和容量随关卡变化）
+**场景描述**：Level 1，5 根螺丝（容量 3），3 根装有混色螺母，2 根空。模型需要选择移动操作。
 
-**动作空间**：`["move_A_B", ...]` 格式（从螺丝 A 移到螺丝 B），数量动态变化；另有 `"undo"` 和 `"next_level"`
-
-**Rules Prompt**：
+**System Message：**
 
 ```
+You are a game-playing AI agent. Respond with only the action string.
+```
+
+**User Prompt：**
+
+```
+You are playing the game "nuts_bolts".
+
+GAME RULES:
 Nuts and Bolts Game Rules
 
 OBJECTIVE:
@@ -366,41 +481,106 @@ AVAILABLE ACTIONS:
 - "select_X": Selects screw X (0-4 or 0-5) as a source, or moves the previously selected nut to screw X.
 - "undo": Reverts the last move.
 - "next_level": Go to the next level when won.
+
+
+Current board:
+r b g
+g r b
+b g r
+
+
+Score: 0
+
+IMPORTANT: You MUST choose exactly one action from this list (copy it exactly):
+[move_0_3, move_0_4, move_1_3, move_1_4, move_2_3, move_2_4, undo]
+
+Pick the best action. Respond with ONLY the action string, nothing else.
 ```
 
-**Prompt 特点**：
-- 棋盘表示是**一维列表的列表**（如 `[["r","b","g"], ["g","r","b"], [], ...]`），不是 2D 网格，模型需要理解"栈"结构（只能操作顶部元素）
-- 动作格式为 `move_A_B`（实际后端格式），但 rules 中写的是旧格式 `select_X`——这是一个**已知的不一致**，实际运行时 prompt 框架中的 valid_actions 列表会显示正确的 `move_A_B` 格式，模型从列表中选择即可
-- 有 **undo 机制**（每局 2 次），比 Sokoban 多一次
-- **多关卡系统**（10 关），难度递增：螺丝数从 5 增到 16，容量从 3 增到 8，颜色种类从 3 增到 14
-- 颜色用单字母表示（`r`=red, `b`=blue, `g`=green 等），模型需要理解颜色编码
-- 这是对 LLM 最有挑战性的游戏之一：需要多步规划（类似河内塔），而单轮推理的 prompt 很难做出最优决策
+**说明**：棋盘中每行代表一根螺丝上的螺母（从底到顶），颜色用单字母编码（r=红, b=蓝, g=绿 等）。`move_A_B` 表示把螺丝 A 顶部的螺母移到螺丝 B。
+
+**模型不知道的信息**：
+- 当前关卡和总关卡数
+- 剩余 undo 次数（不在棋盘中体现）
+- 螺丝容量上限
 
 ---
 
-### 3.1 共性设计
+### 2.8 Sokoban
 
-| 设计要素 | 具体做法 |
-|---------|---------|
-| 输出约束 | 三重强调：system message + rules 末尾 + prompt 末尾 "IMPORTANT" |
-| 合法动作 | 明确列出 valid_actions 列表，强调"必须从中选择" |
-| 棋盘表示 | 数字矩阵（0=空, 1=玩家, 2=对手），统一且简洁 |
-| 策略引导 | 每个游戏提供 2-3 条策略 tips，降低模型盲目落子的概率 |
+**场景描述**：推箱子游戏，玩家在地图中，需要把箱子推到目标位置。
 
-### 3.2 各游戏 Prompt 复杂度对比
+**System Message：**
 
-| 游戏 | 棋盘大小 | 动作格式 | 动作空间 | 规则复杂度 | 每步 Token 消耗 |
-|------|---------|---------|---------|-----------|--------------|
-| Tic Tac Toe | 3×3 | `"row col"` | 1-9 | 低 | ~300 |
-| Four in a Row | 6×7 | `"N"` | 1-7 | 中 | ~500 |
-| Othello 6×6 | 6×6 | `"row col"` | 1-12 | 高 | ~600 |
-| 2048 | 4×4 | `"direction"` | 1-4 | 中 | ~400 |
-| MergeFall | 5×6 | `"drop N"` | 5 | 高 | ~500 |
-| Sokoban | 可变 | `"direction"` | 4-5 | 中 | ~400 |
-| Nuts & Bolts | 可变 | `"move_A_B"` | 动态 | 高 | ~500 |
+```
+You are a game-playing AI agent. Respond with only the action string.
+```
 
-### 3.3 已知问题与改进方向
+**User Prompt：**
 
-1. **Fallback 偏差**：当模型输出格式错误时，fallback 到 `valid_actions[0]`，这个位置并非随机选择，可能导致系统性偏差（如 Othello 中总是偏向左上角）
-2. **无历史记忆**：每步只看当前 board，不记忆之前的走法和对手的策略模式
-3. **单轮推理**：没有 chain-of-thought 或多轮推理，模型只有一次机会输出答案
+```
+You are playing the game "sokoban".
+
+GAME RULES:
+Sokoban Game Rules
+
+OBJECTIVE:
+Push all boxes onto the goal squares.
+
+GAMEPLAY:
+- You control the player character (hardhat worker).
+- You can move up, down, left, or right into empty spaces.
+- You can push a single box by moving into it, provided the space behind the box is empty or a goal.
+- You CANNOT pull boxes.
+- You CANNOT push a box into a wall, the rope obstacle, or another box.
+- You have 1 Undo available per game.
+
+AVAILABLE ACTIONS:
+- "up", "down", "left", "right": Move the player or push a box.
+- "undo": Reverts the last move.
+
+
+Current board:
+{'map': [['#', '#', '#', '#', '#'], ['#', ' ', ' ', '.', '#'], ['#', ' ', ' ', ' ', '#'], ['#', ' ', ' ', ' ', '#'], ['#', '#', '#', '#', '#']], 'player_pos': [2, 1], 'boxes': [[2, 2], [3, 2]]}
+Score: 0
+
+IMPORTANT: You MUST choose exactly one action from this list (copy it exactly):
+[up, down, left, right, undo]
+
+Pick the best action. Respond with ONLY the action string, nothing else.
+```
+
+**说明**：Sokoban 的棋盘是一个字典结构（包含 `map`、`player_pos`、`boxes`），直接被 `str()` 序列化后传给模型。`map` 中 `#`=墙，` `=地板，`.`=目标格，`O`=绳索障碍，`W`=水障碍。`player_pos` 为玩家坐标 `[行, 列]`，`boxes` 为所有箱子坐标列表。
+
+**模型不知道的信息**：
+- 最优解路径
+- 当前关卡编号
+- 是否还有 undo 可用
+
+---
+
+## 3. 信息汇总对比
+
+| 游戏 | 棋盘尺寸 | 棋盘编码 | 操作格式 | 操作数量 | 额外信息 |
+|------|---------|---------|---------|---------|---------|
+| 2048 | 4×4 | 0=空, 数字=方块值 | `"方向"` | 1-4 | 无 |
+| MergeFall | 6×5 | 0=空, 数字=方块值 | `"drop N"` | 5 | next_tile |
+| Four in a Row | 6×7 | 0=空, 1=玩家, 2=Bot | `"列号"` | 1-7 | 无 |
+| Othello 6×6 | 6×6 | 0=空, 1=黑, 2=白 | `"行 列"` 或 `"pass"` | 1-12 | 无 |
+| Tic Tac Toe | 3×3 | 0=空, 1=X, 2=O | `"行 列"` | 1-9 | 位置参考图 |
+| Sliding Puzzle | 3×3 | 0=空, 1-8=方块编号 | `"方向"` | 2-4 | 无 |
+| Nuts and Bolts | N根螺丝 | 颜色字母列表 | `"move_A_B"` | 变化 | 无 |
+| Sokoban | 变化 | 字典（map+坐标） | `"方向"` 或 `"undo"` | 2-5 | 无 |
+
+### 所有游戏共同提供的信息：
+1. 游戏名称
+2. 完整规则文本（固定）
+3. 当前棋盘状态（每步更新）
+4. 当前分数
+5. 合法操作列表（每步更新）
+
+### 所有游戏共同**不**提供的信息：
+1. 历史走法记录（模型只看当前局面）
+2. 对手的算法和策略
+3. 当前难度设置
+4. 未来的随机事件（如 2048 的新方块位置）
