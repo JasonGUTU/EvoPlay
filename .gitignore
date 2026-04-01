@@ -258,3 +258,4 @@ pytest_cache/
 *.sqlite3
 *.dbagent_logs/
 backend/saves/
+*.sh
