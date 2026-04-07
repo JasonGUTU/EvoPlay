@@ -20,13 +20,14 @@ class LLM:
     
     def __init__(
         self,
-        model: str = "gpt-4o-mini",  # Default model (check OpenAI docs for latest)
+        model: str = "gpt-4o-mini",
         api_key: str | None = None,
         api_provider: str | None = None,
         api_base: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 1000,
         no_thinking: bool = False,
+        extra_headers: dict | None = None,
     ):
         """
         Initialize the LLM interface.
@@ -45,6 +46,7 @@ class LLM:
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.no_thinking = no_thinking
+        self._extra_headers = extra_headers or {}
         self._litellm = None  # Will be imported lazily
         self._api_base = api_base
         self._api_key = api_key
@@ -160,12 +162,23 @@ class LLM:
         if self._api_base:
             return self._direct_api_call(full_messages, call_kwargs)
 
-        # Call LiteLLM for standard providers
-        response = self._litellm.completion(
-            model=self.model,
-            messages=full_messages,
-            **call_kwargs
-        )
+        # Call LiteLLM for standard providers with retry
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                call_kwargs["timeout"] = 60
+                response = self._litellm.completion(
+                    model=self.model,
+                    messages=full_messages,
+                    **call_kwargs
+                )
+                break
+            except Exception as e:
+                print(f"  [LLM] API call error (attempt {attempt+1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                    raise
+                import time
+                time.sleep(2 ** attempt)
 
         # Store token usage from response
         usage = getattr(response, "usage", None)
@@ -209,17 +222,35 @@ class LLM:
                 body["max_tokens"] = 4096
 
         api_key = self._api_key or os.environ.get("OPENAI_API_KEY", "")
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        headers.update(self._extra_headers)
         req = urllib.request.Request(
             url,
             data=json.dumps(body).encode(),
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
+            headers=headers,
         )
 
-        resp = urllib.request.urlopen(req, timeout=120)
-        result = json.loads(resp.read())
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                resp = urllib.request.urlopen(req, timeout=60)
+                result = json.loads(resp.read())
+                break
+            except Exception as e:
+                print(f"  [LLM] API call timeout/error (attempt {attempt+1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                    raise
+                import time
+                time.sleep(2 ** attempt)
+                # Recreate request (urlopen consumes it)
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(body).encode(),
+                    headers=headers,
+                )
 
         # Extract usage
         usage_data = result.get("usage", {})

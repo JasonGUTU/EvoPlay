@@ -86,10 +86,16 @@ class MergeFall(BaseGame):
             "height": self.visible_height,
             "score": self.score,
             "next_tile": self.next_tile,
-            "game_over": self.game_over,
             "difficulty": self.difficulty,
-            "valid_actions": self.valid_actions(),
         }
+        va = self.valid_actions()
+        # If no valid actions remain, force game over
+        if not self.game_over and not va:
+            self.game_over = True
+        state.update({
+            "game_over": self.game_over,
+            "valid_actions": va if not self.game_over else [],
+        })
         if self._pre_merge_board is not None:
             state["pre_merge_board"] = self._pre_merge_board
             state["drop_pos"] = self._drop_pos
@@ -109,8 +115,16 @@ class MergeFall(BaseGame):
     def valid_actions(self) -> list[str]:
         if self.game_over:
             return []
-        # A column is valid only if the top visible row (row 1, since row 0 is overflow) is empty
-        return ["drop %d" % c for c in range(self.width) if self.board[1][c] == 0]
+        actions = []
+        for c in range(self.width):
+            if self.board[1][c] == 0:
+                # Column not full
+                actions.append("drop %d" % c)
+            else:
+                # Column full — only valid if next_tile can merge with the top tile
+                if self.board[1][c] == self.next_tile:
+                    actions.append("drop %d" % c)
+        return actions
     
     def get_rules(self) -> str:
         """Return the game rules description."""
@@ -194,8 +208,13 @@ Note: Even if a column looks full, dropping into it might trigger merges that cl
         if any(self.board[0][c] != 0 for c in range(self.width)):
             self.game_over = True
 
+        # Generate next tile before checking game over (valid_actions depends on next_tile)
         if not self.game_over:
             self.next_tile = self._sample_next_tile()
+
+        # Game over if no valid actions remain (all columns full, no possible merges with new tile)
+        if not self.game_over and not self.valid_actions():
+            self.game_over = True
 
         state = self.get_state()
         self._record_log(action, state)

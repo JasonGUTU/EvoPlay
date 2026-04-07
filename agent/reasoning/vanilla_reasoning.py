@@ -38,10 +38,11 @@ class VanillaReasoning(Reasoning):
         temperature: float = 0.7,
         max_tokens: int = 50,
         no_thinking: bool = False,
+        extra_headers: dict | None = None,
     ):
         """
         Initialize vanilla reasoning.
-        
+
         Args:
             model: Model name (e.g., "gpt-4", "claude-3-sonnet-20240229")
             api_key: API key (optional, reads from .env if not provided)
@@ -59,6 +60,7 @@ class VanillaReasoning(Reasoning):
             temperature=temperature,
             max_tokens=max_tokens,
             no_thinking=no_thinking,
+            extra_headers=extra_headers,
         )
     
     def reason(self, game_state: dict[str, Any], valid_actions: list[str], rules: str = "") -> str:
@@ -84,17 +86,27 @@ class VanillaReasoning(Reasoning):
         if rules:
             rules_section = f"\n\nGAME RULES:\n{rules}\n"
         
-        # Build game-specific extra context
+        # Build game-specific extra context and board formatting
         extra_context = ""
+        board_str = self._format_board(board)
+
         if game_name == "mergefall":
             next_tile = game_state.get("next_tile", "?")
             extra_context = f"\nNext tile to drop: {next_tile}\n"
+        elif game_name == "fourinarow":
+            pass  # use default board format
 
         actions_str = ', '.join(valid_actions)
+
+        if game_name == "fourinarow":
+            board_label = "Current board (X=you, O=opponent, .=empty):"
+        else:
+            board_label = "Current board:"
+
         prompt = f"""You are playing the game "{game_name}".{rules_section}
 
-Current board:
-{self._format_board(board)}
+{board_label}
+{board_str}
 Score: {score}
 {extra_context}
 IMPORTANT: You MUST choose exactly one action from this list (copy it exactly):
@@ -143,3 +155,13 @@ Pick the best action. Respond with ONLY the action string, nothing else."""
                 # 1D board
                 return " ".join(str(cell) for cell in board)
         return str(board)
+
+    def _format_fourinarow(self, board: list) -> str:
+        """Format Four in a Row board with X/O symbols and column numbers."""
+        cols = len(board[0]) if board else 7
+        symbol = {0: ".", 1: "X", 2: "O"}
+        header = "  " + " ".join(str(c) for c in range(cols))
+        rows = []
+        for r, row in enumerate(board):
+            rows.append(f"{r} " + " ".join(symbol.get(cell, str(cell)) for cell in row))
+        return header + "\n" + "\n".join(rows)

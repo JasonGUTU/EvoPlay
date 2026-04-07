@@ -54,7 +54,11 @@ class Agent:
         self.agent_log_file = None
         
         # Use model name as player_name if not explicitly provided
-        self.player_name = player_name or getattr(getattr(reasoning, "llm", None), "model", "llm-agent")
+        llm = getattr(reasoning, "llm", None)
+        default_name = getattr(llm, "model", "llm-agent")
+        if llm and not getattr(llm, "no_thinking", True):
+            default_name += "-thinking"
+        self.player_name = player_name or default_name
         # LLM response log (created lazily after session_id is known)
         self._llm_log_file = None
         self._llm_log_writer = None
@@ -311,11 +315,20 @@ class Agent:
             print("\n\nAgent loop interrupted by user")
         except RuntimeError as e:
             print(f"\n\nAgent stopped due to error: {e}")
+            self._log_error(step + 1, str(e))
             self._notify_error(str(e))
         except Exception as e:
             print(f"\n\nError in agent loop: {e}")
+            self._log_error(step + 1, str(e))
             self._notify_error(str(e))
             raise
+
+    def _log_error(self, step: int, error_msg: str) -> None:
+        """Write error record to LLM log so it's visible in analysis."""
+        self._ensure_llm_log()
+        if self._llm_log_writer is not None:
+            self._llm_log_writer.writerow([step, f"ERROR: {error_msg}", "", "ERROR", "", 0, 0])
+            self._llm_log_file.flush()
 
     def _notify_error(self, error_msg: str) -> None:
         """Notify backend about agent error so frontend watchers can see it."""
