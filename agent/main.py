@@ -29,6 +29,7 @@ def create_reasoning(
     temperature: float | None = None,
     max_tokens: int | None = None,
     no_thinking: bool = False,
+    extra_headers: dict | None = None,
 ) -> Reasoning:
     """
     Factory function to create reasoning engine based on method name.
@@ -70,6 +71,7 @@ def create_reasoning(
             temperature=temperature,
             max_tokens=max_tokens,
             no_thinking=no_thinking,
+            extra_headers=extra_headers,
         )
     else:
         raise ValueError(
@@ -206,6 +208,12 @@ Examples:
         default=False,
         help="Disable thinking/reasoning mode for models that support it (e.g., Qwen3.5)",
     )
+    parser.add_argument(
+        "--extra-headers",
+        type=str,
+        default=None,
+        help='Extra HTTP headers as JSON string (e.g., \'{"cf-aig-metadata": "..."}\')',
+    )
 
     return parser.parse_args()
 
@@ -219,6 +227,8 @@ def main():
     
     # Initialize reasoning engine
     try:
+        import json as _json
+        extra_headers = _json.loads(args.extra_headers) if args.extra_headers else None
         reasoning = create_reasoning(
             method=args.reasoning,
             model=args.model,
@@ -228,6 +238,7 @@ def main():
             temperature=args.temperature,
             max_tokens=args.max_tokens,
             no_thinking=args.no_thinking,
+            extra_headers=extra_headers,
         )
         print(f"Using reasoning method: {args.reasoning}")
         print(f"Using model: {args.model}")
