@@ -260,16 +260,16 @@ class NutsBolts(BaseGame):
             self.num_screws = 11
             self.screws = [
                 # Top Row (6 screws)
-                ['p', 'n', 'n', 'o', 'b', 'g'], # 1: Pink, Brown, Brown, Orange, Blue, Green
-                ['r', 'o', 'y', 'g', 'y', 'b'], # 2: Red, Orange, Yellow, Green, Yellow, Blue
-                ['r', 'c', 'g', 'c', 'p', 'b'], # 3: Red, Cyan, Green, Cyan, Pink, Blue
-                ['c', 'n', 'p', 'p', 'y', 'o'], # 4: Cyan, Brown, Pink, Pink, Yellow, Orange
-                ['g', 'b', 'y', 'c', 'b', 'r'], # 5: Green, Blue, Yellow, Cyan, Blue, Red
-                ['y', 'o', 'p', 'g', 'n', 'c'], # 6: Yellow, Orange, Pink, Green, Brown, Cyan
+                ['l', 'c', 'o', 'n', 'n', 'r'], # 1: Lime Green, Cyan, Orange, Brown, Brown, Red
+                ['l', 'y', 'g', 'y', 'o', 'r'], # 2: Lime Green, Yellow, Green, Yellow, Orange, Red
+                ['n', 'p', 'c', 'l', 'c', 'r'], # 3: Brown, Pink, Cyan, Lime Green, Cyan, Red
+                ['c', 'b', 'p', 'p', 'n', 'c'], # 4: Cyan, Blue, Pink, Pink, Brown, Cyan
+                ['p', 'c', 'y', 'b', 'l', 'g'], # 5: Pink, Cyan, Yellow, Blue, Lime Green, Green
+                ['p', 'g', 'p', 'y', 'y', 'b'], # 6: Pink, Green, Pink, Yellow, Yellow, Blue
                 # Bottom Row (5 screws: 3 filled, 2 empty)
-                ['r', 'y', 'b', 'g', 'o', 'p'], # 7: Mixed
-                ['c', 'v', 'n', 'r', 'y', 'b'], # 8: Mixed
-                ['g', 'o', 'p', 'c', 'v', 'n'], # 9: Mixed
+                ['o', 'y', 'b', 'o', 'n', 'r'], # 7: Orange, Yellow, Blue, Orange, Brown, Red
+                ['g', 'o', 'l', 'r', 'g', 'n'], # 8: Green, Orange, Lime Green, Red, Green, Brown
+                ['b', 'l', 'o', 'g', 'b', 'r'], # 9: Blue, Lime Green, Orange, Green, Blue, Red
                 [],                             # 10: Empty
                 []                              # 11: Empty
             ]
@@ -281,22 +281,22 @@ class NutsBolts(BaseGame):
             self.num_screws = 16
             self.screws = [
                 # Top Row (5 screws)
-                ['d', 'b', 't', 't'], # 1: Sand, Blue, Teal, Teal
-                ['v', 'b', 'l', 'p'], # 2: Violet, Blue, Lime, Pink
-                ['s', 'y', 'v', 'v'], # 3: Silver, Yellow, Violet, Violet
-                ['v', 't', 't', 'o'], # 4: Violet, Teal, Teal, Orange
-                ['v', 'b', 'n', 'n'], # 5: Violet, Blue, Brown, Brown
+                ['d', 'b', 't', 't'], # 1: Tan, Blue, Dark Green, Dark Green
+                ['v', 'r', 'l', 'p'], # 2: Purple, Red, Lime Green, Pink
+                ['s', 'm', 'y', 'm'], # 3: Light Gray, Purple, Yellow, Purple
+                ['m', 's', 't', 'o'], # 4: Purple, Light Gray, Dark Green, Orange
+                ['m', 'n', 'b', 'n'], # 5: Purple, Brown, Blue, Brown
                 # Middle Row (6 screws)
-                ['l', 'r', 'y', 'g'], # 6: Lime, Red, Yellow, Green
-                ['n', 'n', 'd', 'o'], # 7: Brown, Brown, Sand, Orange
-                ['c', 'c', 'y', 'c'], # 8: Cyan, Cyan, Yellow, Cyan
-                ['p', 'd', 'd', 'c'], # 9: Pink, Sand, Sand, Cyan
-                ['g', 'l', 'b', 'b'], # 10: Green, Lime, Blue, Blue
-                ['g', 'l', 'o', 'o'], # 11: Green, Lime, Orange, Orange
+                ['l', 'r', 'y', 'g'], # 6: Lime Green, Red, Yellow, Green
+                ['n', 'n', 'd', 'o'], # 7: Brown, Brown, Tan, Orange
+                ['c', 'g', 'y', 'c'], # 8: Sky Blue, Green, Yellow, Sky Blue
+                ['p', 's', 'd', 'c'], # 9: Pink, Light Gray, Tan, Sky Blue
+                ['g', 'l', 'v', 'b'], # 10: Green, Lime Green, Purple, Blue
+                ['g', 'l', 'o', 'o'], # 11: Green, Lime Green, Orange, Orange
                 # Bottom Row (5 screws)
-                ['b', 'v', 'v', 's'], # 12: Blue, Violet, Violet, Silver
-                ['r', 'p', 'd', 'r'], # 13: Red, Pink, Sand, Red
-                ['y', 'c', 'p', 't'], # 14: Yellow, Cyan, Pink, Teal
+                ['b', 'v', 'v', 's'], # 12: Blue, Purple, Purple, Light Gray
+                ['r', 'p', 'd', 'r'], # 13: Red, Pink, Tan, Red
+                ['y', 'c', 'p', 't'], # 14: Yellow, Sky Blue, Pink, Dark Green
                 [],                   # 15: Empty
                 []                    # 16: Empty
             ]
