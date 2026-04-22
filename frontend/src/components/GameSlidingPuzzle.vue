@@ -76,21 +76,11 @@ async function clickTile(r, c) {
 }
 
 async function resetGame(newDifficulty) {
-  if (newDifficulty && typeof newDifficulty === 'string') {
-    difficulty.value = newDifficulty;
-  }
+  if (newDifficulty) difficulty.value = newDifficulty;
   error.value = "";
   const sid = resetSessionId("sliding_puzzle");
   sessionId.value = sid;
-  
-  let url;
-  if (newDifficulty && typeof newDifficulty === 'string') {
-    url = addSessionToUrl(`${API}/reset?difficulty=${difficulty.value}`, sid);
-  } else {
-    url = addSessionToUrl(`${API}/reset`, sid);
-  }
-  
-  const res = await fetch(url);
+  const res = await fetch(addSessionToUrl(`${API}/reset?difficulty=${difficulty.value}`, sid));
   applyState(await res.json());
 }
 

@@ -269,21 +269,12 @@ async function sendAction(move) {
 }
 
 async function resetGame(newDifficulty) {
-  if (newDifficulty && typeof newDifficulty === 'string') {
-    difficulty.value = newDifficulty;
-  }
+  if (newDifficulty) difficulty.value = newDifficulty;
   lastAction.value = "";
   error.value = "";
   const sid = resetSessionId("2048");
   sessionId.value = sid;
-  
-  let url;
-  if (newDifficulty && typeof newDifficulty === 'string') {
-    url = addSessionToUrl(`${API}/reset?difficulty=${difficulty.value}`, sid);
-  } else {
-    url = addSessionToUrl(`${API}/reset`, sid);
-  }
-  
+  const url = addSessionToUrl(`${API}/reset?difficulty=${difficulty.value}`, sid);
   const res = await fetch(url);
   const data = await res.json();
   if (data.session_id) {
