@@ -58,12 +58,21 @@ async function sendAction(actionStr) {
 }
 
 async function resetGame(newDifficulty) {
-  if (newDifficulty) difficulty.value = newDifficulty;
+  if (newDifficulty && typeof newDifficulty === 'string') {
+    difficulty.value = newDifficulty;
+  }
   lastAction.value = "";
   error.value = "";
   // Use current session ID to reset current level instead of creating a new session (which would drop to level 1)
   const sid = sessionId.value || getSessionId("nuts_bolts");
-  const url = addSessionToUrl(`${API}/reset?difficulty=${difficulty.value}`, sid);
+  
+  let url;
+  if (newDifficulty && typeof newDifficulty === 'string') {
+    url = addSessionToUrl(`${API}/reset?difficulty=${difficulty.value}`, sid);
+  } else {
+    url = addSessionToUrl(`${API}/reset`, sid);
+  }
+  
   const res = await fetch(url);
   const data = await res.json();
   if (data.session_id) {
@@ -181,7 +190,8 @@ const colorMap = {
   't': '#0d9488', // teal (blueish green)
   'k': '#15803d', // dark green (green-700)
   'd': '#d4b996', // sand/beige
-  'l': '#84cc16'  // lime
+  'l': '#84cc16', // lime
+  '?': '#e2e8f0'  // light grey for hidden nuts
 };
 
 const screwContainerStyle = computed(() => {
@@ -190,6 +200,9 @@ const screwContainerStyle = computed(() => {
   }
   if (screwCapacity.value >= 6) {
     return { height: '240px' };
+  }
+  if (screwCapacity.value === 5) {
+    return { height: '210px' };
   }
   return {};
 });
@@ -201,6 +214,9 @@ const screwPegStyle = computed(() => {
   if (screwCapacity.value >= 6) {
     return { height: '200px' };
   }
+  if (screwCapacity.value === 5) {
+    return { height: '170px' };
+  }
   return {};
 });
 
@@ -210,6 +226,9 @@ const nutsStackStyle = computed(() => {
   }
   if (screwCapacity.value >= 6) {
     return { height: '200px' };
+  }
+  if (screwCapacity.value === 5) {
+    return { height: '170px' };
   }
   return {};
 });
@@ -235,7 +254,7 @@ function nutStyle(color, isTop, isSelectedScrew) {
     <!-- Difficulty -->
     <div class="difficulty-bar" style="display: flex; justify-content: center; gap: 8px; margin-bottom: 16px;">
       <button 
-        v-for="d in [{label:'Easy', value:'easy'}, {label:'Medium', value:'medium'}, {label:'Hard', value:'hard'}]"
+        v-for="d in [{label:'Easy', value:'easy'}, {label:'Medium', value:'medium'}, {label:'Hard', value:'hard'}, {label:'Extra', value:'extra'}]"
         :key="d.value"
         :class="{ active: difficulty === d.value }"
         :style="difficulty === d.value ? 'background: #3b82f6; color: white;' : 'background: #334155; color: white;'"
@@ -331,8 +350,9 @@ function nutStyle(color, isTop, isSelectedScrew) {
                 :style="nutStyle(color, nutIdx === screw.length - 1, localSelected === idx)"
               >
                 <!-- Optional: add visual ridges to nuts -->
-                <div class="nut-ridge"></div>
-                <div class="nut-ridge"></div>
+                <div class="nut-ridge" v-if="color !== '?'"></div>
+                <div class="nut-ridge" v-if="color !== '?'"></div>
+                <span v-if="color === '?'" style="color: #475569; font-weight: bold; font-size: 1.2rem;">?</span>
               </div>
             </div>
           </div>

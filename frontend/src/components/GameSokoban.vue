@@ -64,7 +64,12 @@ async function resetGame(newDifficulty) {
   error.value = "";
   // Use current session ID to reset current level instead of creating a new session (which would drop to level 1)
   const sid = sessionId.value || getSessionId("sokoban");
-  const url = addSessionToUrl(`${API}/reset?difficulty=${difficulty.value}`, sid);
+  let url;
+  if (typeof newDifficulty === 'string') {
+    url = addSessionToUrl(`${API}/reset?difficulty=${difficulty.value}`, sid);
+  } else {
+    url = addSessionToUrl(`${API}/reset`, sid);
+  }
   const res = await fetch(url);
   const data = await res.json();
   if (data.session_id) {

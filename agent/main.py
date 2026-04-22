@@ -17,7 +17,7 @@ if str(_project_root) not in sys.path:
 
 from agent.agent import Agent
 from agent.config import config
-from agent.reasoning import Reasoning, VanillaReasoning
+from agent.reasoning import Reasoning, VanillaReasoning, RLReasoning
 
 
 def create_reasoning(
@@ -31,6 +31,7 @@ def create_reasoning(
     no_thinking: bool = False,
     extra_headers: dict | None = None,
     use_cot: bool = False,
+    game_name: str = "tictactoe",
 ) -> Reasoning:
     """
     Factory function to create reasoning engine based on method name.
@@ -75,10 +76,15 @@ def create_reasoning(
             extra_headers=extra_headers,
             use_cot=use_cot,
         )
+    elif method_lower == "rl":
+        return RLReasoning(
+            model_path=model,  # Reusing model arg for model_path, if provided
+            game_name=game_name,
+        )
     else:
         raise ValueError(
             f"Unknown reasoning method: {method}. "
-            f"Available methods: vanilla (or litellm for backward compatibility)"
+            f"Available methods: vanilla, rl (or litellm for backward compatibility)"
         )
 
 
@@ -254,6 +260,7 @@ def main():
             no_thinking=args.no_thinking,
             extra_headers=extra_headers,
             use_cot=args.use_cot,
+            game_name=args.game,
         )
         print(f"Using reasoning method: {args.reasoning}")
         print(f"Using model: {args.model}")

@@ -281,13 +281,14 @@ class Agent:
         self.agent_log_file.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
         self.agent_log_file.flush()
 
-    def run_loop(self, max_steps: int | None = None, delay: float = 1.0):
+    def run_loop(self, max_steps: int | None = None, delay: float = 1.0, continue_to_level: int | None = None):
         """
         Run the agent in a loop, continuously playing the game.
         
         Args:
             max_steps: Maximum number of steps to take (None for infinite)
             delay: Delay in seconds between steps
+            continue_to_level: Continue playing to this level (for games that support next_level)
         """
         print(f"Starting agent loop for game '{self.game_name}'")
         print(f"Backend URL: {self.backend_url}")

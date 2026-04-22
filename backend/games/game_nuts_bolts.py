@@ -12,7 +12,7 @@ NUM_SCREWS = 5
 SCREW_CAPACITY = 3
 MAX_UNDOS = 2
 
-VALID_DIFFICULTIES = {"easy", "medium", "hard"}
+VALID_DIFFICULTIES = {"easy", "medium", "hard", "extra"}
 
 class NutsBolts(BaseGame):
     """Nuts and bolts sorting game."""
@@ -21,6 +21,7 @@ class NutsBolts(BaseGame):
 
     def __init__(self) -> None:
         self.screws: list[list[str]] = []
+        self.revealed: list[list[bool]] = []
         self.score: int = 0
         self.game_over: bool = False
         self.won: bool = False
@@ -29,7 +30,7 @@ class NutsBolts(BaseGame):
         self.history: list[dict[str, Any]] = []
         self.selected_screw: int | None = None
         self.current_level: int = 1
-        self.max_level: int = 10
+        self.max_level: int = 12
         self.screw_capacity: int = 3
         self.num_screws: int = NUM_SCREWS
         self.difficulty: str = "easy"
@@ -46,14 +47,26 @@ class NutsBolts(BaseGame):
                 self.current_level = 5
             elif difficulty == "hard":
                 self.current_level = 8
+            elif difficulty == "extra":
+                self.current_level = 11
             self.reset()
 
     # ── BaseGame interface ──────────────────────────────────────────
 
     def get_state(self) -> dict[str, Any]:
+        masked_board = []
+        for i, screw in enumerate(self.screws):
+            masked_screw = []
+            for j, color in enumerate(screw):
+                if i < len(self.revealed) and j < len(self.revealed[i]) and self.revealed[i][j]:
+                    masked_screw.append(color)
+                else:
+                    masked_screw.append('?')
+            masked_board.append(masked_screw)
+            
         return {
             "game": self.name,
-            "board": deepcopy(self.screws),
+            "board": masked_board,
             "score": self.score,
             "game_over": self.game_over,
             "won": self.won,
@@ -325,6 +338,61 @@ class NutsBolts(BaseGame):
                 [], # 11
                 []  # 12
             ]
+        elif level == 11:
+            # New Level 11 from image: 11 screws (9 filled, 2 empty), capacity 8
+            # Colors: 9 distinct colors: orange(o), light green(l), yellow(y), brown(n), pink(p), red(r), sky blue(c), dark blue(b), green(g)
+            self.screw_capacity = 8
+            self.num_screws = 11
+            self.screws = [
+                # Top Row (Screws 1-6)
+                ['l', 'p', 'n', 'y', 'y', 'l', 'o', 'o'], # 1
+                ['n', 'l', 'c', 'y', 'c', 'p', 'c', 'r'], # 2
+                ['n', 'b', 'r', 'n', 'p', 'r', 'r', 'l'], # 3
+                ['p', 'c', 'p', 'b', 'y', 'b', 'b', 'c'], # 4
+                ['o', 'p', 'b', 'c', 'r', 'o', 'r', 'o'], # 5
+                ['g', 'p', 'g', 'y', 'c', 'g', 'l', 'l'], # 6
+                # Bottom Row (Screws 7-11)
+                ['b', 'p', 'y', 'c', 'b', 'o', 'r', 'y'], # 7
+                ['r', 'g', 'g', 'g', 'n', 'g', 'n', 'l'], # 8
+                ['y', 'b', 'l', 'o', 'n', 'g', 'n', 'o'], # 9
+                [], # 10
+                []  # 11
+            ]
+        elif level == 12:
+            # Previous Level 11: 14 screws (12 filled, 2 empty), capacity 5
+            # Colors: 12 distinct colors:
+            # violet (v), yellow (y), light green (l), dark green (k), red (r), green (g), 
+            # pink (p), grey (s), brown (n), sky blue (c), blue (b), orange (o)
+            self.screw_capacity = 5
+            self.num_screws = 14
+            self.screws = [
+                # Row 1 (Screws 1-5)
+                ['v', 'b', 'r', 'g', 'v'], # 1
+                ['l', 'l', 'p', 'p', 'y'], # 2
+                ['n', 'l', 'c', 's', 'l'], # 3
+                ['n', 'o', 'n', 'y', 'k'], # 4
+                ['c', 'v', 'l', 'n', 'r'], # 5
+                # Row 2 (Screws 6-10)
+                ['c', 'y', 'k', 'k', 'r'], # 6
+                ['p', 'b', 'y', 'c', 'r'], # 7
+                ['o', 'g', 's', 's', 'c'], # 8
+                ['o', 'y', 'o', 'r', 'p'], # 9
+                ['g', 'g', 'v', 'v', 'b'], # 10
+                # Row 3 (Screws 11-14)
+                ['b', 'n', 'k', 's', 's'], # 11
+                ['b', 'p', 'o', 'g', 'k'], # 12
+                [], # 13
+                []  # 14
+            ]
+            
+        # Initialize revealed status
+        self.revealed = []
+        for screw in self.screws:
+            if level == 12:
+                # Level 12 special rule: only the top nut is revealed initially
+                self.revealed.append([i == len(screw) - 1 for i in range(len(screw))])
+            else:
+                self.revealed.append([True for _ in range(len(screw))])
             
         self._save_state()
 
@@ -376,6 +444,7 @@ AVAILABLE ACTIONS:
         # Only keep the last state for Undo
         self.history.append({
             "board": deepcopy(self.screws),
+            "revealed": deepcopy(self.revealed),
             "score": self.score
         })
 
@@ -387,6 +456,7 @@ AVAILABLE ACTIONS:
             # Restore previous state
             prev_state = self.history[-1]
             self.screws = deepcopy(prev_state["board"])
+            self.revealed = deepcopy(prev_state["revealed"])
             self.score = deepcopy(prev_state["score"])
             self.undos_remaining -= 1
             self.selected_screw = None
@@ -433,7 +503,13 @@ AVAILABLE ACTIONS:
         self._save_state()
         
         nut = self.screws[src].pop()
+        rev = self.revealed[src].pop()
         self.screws[dst].append(nut)
+        self.revealed[dst].append(rev)
+        
+        # Reveal new top nut if source screw is not empty
+        if len(self.screws[src]) > 0:
+            self.revealed[src][-1] = True
         
         # Update score after move
         self._update_score()
@@ -454,10 +530,10 @@ AVAILABLE ACTIONS:
         # Get the color of the top nut
         color = src_screw[-1]
         
-        # Count how many nuts of this color are continuous at the top
+        # Count how many nuts of this color are continuous and revealed at the top
         count = 0
         for i in range(len(src_screw) - 1, -1, -1):
-            if src_screw[i] == color:
+            if src_screw[i] == color and self.revealed[src_idx][i]:
                 count += 1
             else:
                 break
@@ -469,7 +545,13 @@ AVAILABLE ACTIONS:
         # Move the nuts
         for _ in range(nuts_to_move):
             nut = src_screw.pop()
+            rev = self.revealed[src_idx].pop()
             dst_screw.append(nut)
+            self.revealed[dst_idx].append(rev)
+            
+        # Reveal new top nut if source screw is not empty
+        if len(self.screws[src_idx]) > 0:
+            self.revealed[src_idx][-1] = True
             
         self._update_score()
         return True
@@ -498,6 +580,12 @@ AVAILABLE ACTIONS:
             target_towers = 9
         elif self.current_level == 9:
             target_towers = 14
+        elif self.current_level == 10:
+            target_towers = 10
+        elif self.current_level == 11:
+            target_towers = 9
+        elif self.current_level == 12:
+            target_towers = 12
         else:
             target_towers = 10
         completed_towers = 0

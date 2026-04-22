@@ -93,7 +93,10 @@ async function fetchState() {
   applyState(data);
 }
 
-async function resetGame() {
+async function resetGame(newDifficulty) {
+  if (newDifficulty && typeof newDifficulty === 'string') {
+    difficulty.value = newDifficulty;
+  }
   error.value = "";
   noteMode.value = false;
   selectedCell.value = null;
