@@ -1,6 +1,7 @@
 # Game logs (generated at runtime)
 backend/logs/
 backend/llm_logs/
+agent_logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
