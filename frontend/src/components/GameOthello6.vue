@@ -90,22 +90,12 @@ async function placeDisc(r, c) {
 }
 
 async function resetGame(newDifficulty) {
-  if (newDifficulty && typeof newDifficulty === 'string') {
-    difficulty.value = newDifficulty;
-  }
+  if (newDifficulty) difficulty.value = newDifficulty;
   error.value = "";
   hoverCell.value = null;
   isThinking.value = false;
   const sid = sessionId.value || getSessionId("othello6");
-  
-  let url;
-  if (newDifficulty && typeof newDifficulty === 'string') {
-    url = addSessionToUrl(`${API}/reset?difficulty=${difficulty.value}`, sid);
-  } else {
-    url = addSessionToUrl(`${API}/reset`, sid);
-  }
-  
-  const res = await fetch(url);
+  const res = await fetch(addSessionToUrl(`${API}/reset?difficulty=${difficulty.value}`, sid));
   applyState(await res.json());
 }
 
