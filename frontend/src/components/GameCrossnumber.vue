@@ -58,14 +58,18 @@ async function fetchState() {
 }
 
 // Start game
-async function startGame() {
+async function startGame(withDifficulty = false) {
   try {
     isLoading.value = true;
     errorMsg.value = "";
     const newSessionId = resetSessionId(gameId);
     sessionId.value = newSessionId;
 
-    const res = await fetch(`/api/game/${gameId}/reset?session_id=${newSessionId}&difficulty=${state.value.difficulty}&player_name=${encodeURIComponent(props.playerName)}`);
+    let url = `/api/game/${gameId}/reset?session_id=${newSessionId}&player_name=${encodeURIComponent(props.playerName)}`;
+    if (withDifficulty) {
+      url += `&difficulty=${state.value.difficulty}`;
+    }
+    const res = await fetch(url);
     const data = await res.json();
     if (data.error) {
       errorMsg.value = data.error;
@@ -87,7 +91,7 @@ const DIFFICULTIES = [
 
 async function applyDifficulty(diff) {
   state.value.difficulty = diff;
-  await startGame();
+  await startGame(true);
 }
 
 // Send action
@@ -190,7 +194,7 @@ onMounted(async () => {
       await fetchState();
       isLoading.value = false;
     } else {
-      await startGame();
+      await startGame(true);
     }
   }
 });
