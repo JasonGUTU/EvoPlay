@@ -63,13 +63,19 @@ class Sokoban(BaseGame):
     def set_difficulty(self, difficulty: str) -> None:
         if difficulty in VALID_DIFFICULTIES:
             self.difficulty = difficulty
-            # Map difficulty to starting level
+            # Map difficulty to starting level (legacy fallback)
             if difficulty == "easy":
                 self.current_level = 1
             elif difficulty == "medium":
                 self.current_level = 5
             elif difficulty == "hard":
                 self.current_level = 8
+            self.reset()
+
+    def set_level(self, level: int) -> None:
+        """Jump to a specific level. Triggers a full reset so a new log file is created."""
+        if 1 <= level <= self.max_level:
+            self.current_level = level
             self.reset()
 
     # ── BaseGame interface ──────────────────────────────────────────
@@ -112,8 +118,10 @@ class Sokoban(BaseGame):
             self.withdrawn = True
             self.game_over = True
         elif action == "next_level":
+            # Start a new log for the new level so each level is its own session.
             self.current_level += 1
-            self._load_level(self.current_level)
+            self.reset()
+            return self.get_state()
         elif action in ["up", "down", "left", "right"]:
             self._move(action)
             if not self.game_over and self._is_deadlocked():

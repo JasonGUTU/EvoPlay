@@ -9,6 +9,7 @@ REMOTE_DIR="/home/ubuntu/EvoPlay"
 echo "=== Step 1: Sync code to server ==="
 rsync -avz --exclude 'node_modules' --exclude '__pycache__' --exclude '.git' \
     --exclude 'backend/logs' --exclude 'backend/llm_logs' --exclude 'agent_logs' \
+    --exclude 'evolution_logs' --exclude 'human_data' \
     -e "ssh -i $KEY" \
     /Users/shaoshao/Desktop/EvoPlay/ $SERVER:$REMOTE_DIR/
 

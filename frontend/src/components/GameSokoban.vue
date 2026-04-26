@@ -58,15 +58,14 @@ async function sendAction(move) {
   logRef.value?.fetchLog();
 }
 
-async function resetGame(newDifficulty) {
-  if (typeof newDifficulty === 'string') difficulty.value = newDifficulty;
+async function resetGame(level) {
+  // level: a number jumps to that level (new log); undefined just restarts the current level.
   lastAction.value = "";
   error.value = "";
-  // Use current session ID to reset current level instead of creating a new session (which would drop to level 1)
   const sid = sessionId.value || getSessionId("sokoban");
   let url;
-  if (typeof newDifficulty === 'string') {
-    url = addSessionToUrl(`${API}/reset?difficulty=${difficulty.value}`, sid);
+  if (typeof level === 'number') {
+    url = addSessionToUrl(`${API}/reset?level=${level}`, sid);
   } else {
     url = addSessionToUrl(`${API}/reset`, sid);
   }
@@ -191,16 +190,16 @@ function isPlayer(r, c) {
       <h3>Level {{ currentLevel }}</h3>
     </div>
 
-    <!-- Difficulty -->
-    <div class="difficulty-bar" style="display: flex; justify-content: center; gap: 8px; margin-bottom: 16px;">
-      <button 
-        v-for="d in [{label:'Easy', value:'easy'}, {label:'Medium', value:'medium'}, {label:'Hard', value:'hard'}]"
-        :key="d.value"
-        :class="{ active: difficulty === d.value }"
-        :style="difficulty === d.value ? 'background: #3b82f6; color: white;' : 'background: #334155; color: white;'"
-        @click="resetGame(d.value)"
+    <!-- Level selector -->
+    <div class="level-bar" style="display: flex; justify-content: center; gap: 6px; margin-bottom: 16px; flex-wrap: wrap;">
+      <button
+        v-for="lvl in maxLevel"
+        :key="lvl"
+        :class="{ active: currentLevel === lvl }"
+        :style="currentLevel === lvl ? 'background: #3b82f6; color: white;' : 'background: #334155; color: white;'"
+        @click="resetGame(lvl)"
       >
-        {{ d.label }}
+        {{ lvl }}
       </button>
     </div>
 
@@ -215,14 +214,14 @@ function isPlayer(r, c) {
         <button 
           v-if="won && currentLevel < maxLevel"
           class="next-level-btn"
-          @click="sendAction('next_level')"
+          @click="resetGame(currentLevel + 1)"
         >
           Next Level
         </button>
         <button
           v-else-if="withdrawn && currentLevel < maxLevel"
           class="next-level-btn"
-          @click="sendAction('next_level')"
+          @click="resetGame(currentLevel + 1)"
         >
           Next Level
         </button>
@@ -317,8 +316,8 @@ function isPlayer(r, c) {
 }
 
 /* Difficulty */
-.difficulty-bar button { padding: 6px 12px; border: 1px solid #555; border-radius: 4px; cursor: pointer; transition: all 0.2s ease; }
-.difficulty-bar button:hover:not(.active) { background: #444 !important; }
+.level-bar button { min-width: 36px; padding: 6px 10px; border: 1px solid #555; border-radius: 4px; cursor: pointer; transition: all 0.2s ease; font-weight: 600; }
+.level-bar button:hover:not(.active) { background: #444 !important; }
 
 .info-bar {
   display: flex;

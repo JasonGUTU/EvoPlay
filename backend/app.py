@@ -247,6 +247,14 @@ def game_reset(name: str):
     difficulty = request.args.get("difficulty")
     if difficulty and hasattr(game, "set_difficulty"):
         game.set_difficulty(difficulty)
+
+    level_arg = request.args.get("level")
+    if level_arg and hasattr(game, "set_level"):
+        try:
+            game.set_level(int(level_arg))
+        except (TypeError, ValueError):
+            pass
+
     game.reset()
         
     state = game.get_state()

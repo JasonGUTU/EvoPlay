@@ -263,3 +263,8 @@ backend/saves/
 export_results.py
 find_sessions.py
 claude_reports/
+
+# Experiment artifacts
+evolution_logs/
+human_data/
+backend/cache/

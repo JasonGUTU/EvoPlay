@@ -98,7 +98,7 @@ class BaseGame(ABC):
         
         # Write CSV header
         writer = csv.writer(self._log_file)
-        writer.writerow(["step", "timestamp", "time", "game", "player", "difficulty", "action", "score", "game_over", "board"])
+        writer.writerow(["step", "timestamp", "time", "game", "player", "difficulty", "level", "action", "score", "game_over", "board"])
 
     def _record_log(self, action: str, state: dict[str, Any]) -> None:
         """Append one log entry to memory and flush to disk."""
@@ -126,6 +126,7 @@ class BaseGame(ABC):
             # Convert board to JSON string for CSV storage
             board_str = json.dumps(entry["board"], ensure_ascii=False) if entry["board"] else ""
             difficulty = getattr(self, "difficulty", "")
+            level = getattr(self, "current_level", "")
             writer.writerow([
                 entry["step"],
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -133,6 +134,7 @@ class BaseGame(ABC):
                 self.name,
                 self._player_name or "",
                 difficulty,
+                level,
                 entry["action"],
                 entry["score"],
                 entry["game_over"],
